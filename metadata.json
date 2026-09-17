@@ -1,0 +1,6 @@
+{
+  "name": "DIY Electronics",
+  "description": "The digital operating bench for DIY electronics engineers, featuring real-time circuit simulation, diagnostics, spare parts sourcing, and compliance verification.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

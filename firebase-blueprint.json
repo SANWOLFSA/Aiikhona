@@ -1,0 +1,71 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User workspace metrics, role, and progress data.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "avatar": { "type": "string" },
+        "role": { "type": "string" },
+        "authProvider": { "type": "string" },
+        "reputationPoints": { "type": "number" },
+        "repairsCompleted": { "type": "number" },
+        "eWasteDivertedKg": { "type": "number" },
+        "co2SavedKg": { "type": "number" },
+        "completedCourseIds": { "type": "array" },
+        "savedGuideIds": { "type": "array" },
+        "badges": { "type": "array" }
+      },
+      "required": ["id", "name", "email", "role"]
+    },
+    "UserMetadataUpload": {
+      "title": "UserMetadataUpload",
+      "description": "Stores user account metadata and upload dates in Firestore.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileType": { "type": "string" },
+        "uploadDate": { "type": "string" },
+        "accountEmail": { "type": "string" },
+        "metadataSizeKb": { "type": "number" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "userId", "fileName", "uploadDate", "accountEmail"]
+    },
+    "UserFile": {
+      "title": "UserFile",
+      "description": "Stores user uploaded files metadata and download URLs.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileSizeKb": { "type": "number" },
+        "fileType": { "type": "string" },
+        "downloadUrl": { "type": "string" },
+        "storagePath": { "type": "string" },
+        "uploadedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "fileName", "downloadUrl", "storagePath"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Users profile collections for platform credentials."
+    },
+    "/user_metadata_uploads/{recordId}": {
+      "schema": "UserMetadataUpload",
+      "description": "Stores specific user data, metadata upload dates, and account info."
+    },
+    "/user_files/{fileId}": {
+      "schema": "UserFile",
+      "description": "Stores user uploaded files and download URLs."
+    }
+  }
+}

@@ -83,7 +83,7 @@ export default function DiagnosticTool({ onSourcePart, onOpenGuide }: { onSource
     // Simulate high-fidelity diagnostic reasoning
     setTimeout(() => {
       let probableCause = `Power delivery management breakdown in ${model}`;
-      let requiredTools = ["Digital Multimeter (Diode Mode)", "Hot Air Station (350°C)", "Tacky Flux (Amtech NC-559)", "0402 Solder Wick"];
+      const requiredTools = ["Digital Multimeter (Diode Mode)", "Hot Air Station (350°C)", "Tacky Flux (Amtech NC-559)", "0402 Solder Wick"];
       let testPoints = [
         "VBUS 5V/15V rail: Measure across input filter capacitor for continuity short to ground.",
         "M92T36 Pin 5 / 6 bypass capacitor: Diode mode reading should be 0.45V - 0.52V. Under 0.05V indicates internal IC punch-through.",
@@ -94,8 +94,8 @@ export default function DiagnosticTool({ onSourcePart, onOpenGuide }: { onSource
         { stepNumber: 2, title: "Thermal Tracing / Freeze Spray", detail: "If a rail is shorted, inject 1.2V 1A into the rail using a bench power supply to verify if the chip glows hot." },
         { stepNumber: 3, title: "Hot Air IC Replacement", detail: "Shield adjacent plastic connectors with Kapton tape, apply tacky flux, reflow at 340°C, clean pads, and install fresh replacement." }
       ];
-      let estimatedCost = "$4.50 for replacement IC";
-      let repairabilityScore = "9/10 (Standard bench fix)";
+      const estimatedCost = "$4.50 for replacement IC";
+      const repairabilityScore = "9/10 (Standard bench fix)";
 
       // Handle custom outputs based on selections for ultimate realism!
       if (model.toLowerCase().includes("switch")) {

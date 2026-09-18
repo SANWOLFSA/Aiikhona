@@ -1,5 +1,10 @@
 import { useState } from 'react';
 import { Bot, Send, User, Sparkles, RefreshCw } from 'lucide-react';
+import { GoogleGenAI } from '@google/genai';
+
+const ai = new GoogleGenAI({ 
+  apiKey: import.meta.env.VITE_GEMINI_API_KEY || '' 
+});
 
 interface Message {
   id: string;
@@ -17,6 +22,7 @@ export default function AiAssistantView() {
       timestamp: 'Just now'
     }
   ]);
+
   const [input, setInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -26,47 +32,57 @@ export default function AiAssistantView() {
 
     const userText = input.trim();
     setInput('');
+
     const userMsg: Message = {
       id: `usr_${Date.now()}`,
       sender: 'user',
       text: userText,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
-
+    
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
     setIsGenerating(true);
 
     try {
-      const history = messages.map(m => ({
-        role: m.sender === 'user' ? 'user' : 'model',
-        text: m.text
-      }));
+      if (!import.meta.env.VITE_GEMINI_API_KEY) {
+        throw new Error("Missing VITE_GEMINI_API_KEY. Please add it in Netlify Environment Variables.");
+      }
 
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userText, history })
+      const formattedHistory = messages
+        .filter(m => m.id !== '1')
+        .map(m => ({
+          role: m.sender === 'user' ? 'user' : 'model',
+          parts: [{ text: m.text }]
+        }));
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [
+          ...formattedHistory,
+          { role: 'user', parts: [{ text: userText }] }
+        ],
+        config: {
+          systemInstruction: "You are SANWOLF, an AI Repair Copilot specialized in DIY electronics. Provide clear, step-by-step troubleshooting for motherboards, soldering, components, and general electronics repair.",
+        }
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to get AI response');
-      }
+      const replyText = response.text || "I'm sorry, I couldn't generate a response.";
 
       const assistantMsg: Message = {
         id: `ast_${Date.now()}`,
         sender: 'assistant',
-        text: data.reply,
+        text: replyText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
+      
       setMessages(prev => [...prev, assistantMsg]);
     } catch (error: any) {
       console.error("AI Assistant error:", error);
       const errorMsg: Message = {
         id: `err_${Date.now()}`,
         sender: 'assistant',
-        text: `Sorry, I encountered an error connecting to the AI Repair Copilot: ${error.message || 'Please check your API key in Settings > Secrets'}.`,
+        text: `Error connecting to AI: ${error.message}`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setMessages(prev => [...prev, errorMsg]);
@@ -116,6 +132,7 @@ export default function AiAssistantView() {
             </div>
           </div>
         ))}
+
         {isGenerating && (
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-amber-400 text-stone-950 flex items-center justify-center shadow-md animate-pulse">

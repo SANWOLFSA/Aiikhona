@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Cpu, Mail, Lock, User, ArrowRight, Image as ImageIcon, RefreshCw, AlertCircle } from 'lucide-react';
+import { Cpu, Mail, Lock, User, ArrowRight, AlertCircle } from 'lucide-react';
 import type { UserProfile } from '../types';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, FacebookAuthProvider, signInWithPopup } from 'firebase/auth';
@@ -385,6 +385,71 @@ export default function LandingPage({
               {!loading && <ArrowRight className="w-4 h-4 stroke-[2.5]" />}
             </button>
           </form>
+
+          {/* Instant 1-Click Demo / Guest Bench Access */}
+          <div className="pt-2 space-y-2">
+            <div className="relative flex py-1 items-center">
+              <div className="flex-grow border-t border-amber-300/40 dark:border-amber-700/40"></div>
+              <span className="flex-shrink mx-3 text-[10px] text-amber-600 dark:text-amber-400 font-black uppercase tracking-widest flex items-center gap-1">
+                <span>⚡ Instant Bench Access</span>
+              </span>
+              <div className="flex-grow border-t border-amber-300/40 dark:border-amber-700/40"></div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const demoTech: UserProfile = {
+                    id: "tech_usr_demo_1",
+                    name: "Alex Vance (Lead Technician)",
+                    email: "alex.bench@diyelectronics.org",
+                    authProvider: "Instant Bench Demo",
+                    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+                    role: "Technician",
+                    repairsCompleted: 27,
+                    eWasteDivertedKg: 64.8,
+                    co2SavedKg: 182.4,
+                    reputationPoints: 1420,
+                    badges: [],
+                    completedCourseIds: ["course_1"],
+                    savedGuideIds: ["guide_1", "guide_3"],
+                    customBackground: bgImage
+                  };
+                  onLoginSuccess(demoTech);
+                }}
+                className="py-2.5 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-stone-950 font-black text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
+              >
+                <span>🚀 Enter as Technician</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const demoAdmin: UserProfile = {
+                    id: "admin_usr_demo_1",
+                    name: "Sarah Lin (Chief Engineer)",
+                    email: "admin@diyelectronics.org",
+                    authProvider: "Instant Bench Demo",
+                    avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80",
+                    role: "Admin",
+                    repairsCompleted: 45,
+                    eWasteDivertedKg: 112.5,
+                    co2SavedKg: 340.0,
+                    reputationPoints: 3200,
+                    badges: [],
+                    completedCourseIds: ["course_1", "course_2"],
+                    savedGuideIds: ["guide_1", "guide_2", "guide_3"],
+                    customBackground: bgImage
+                  };
+                  onLoginSuccess(demoAdmin);
+                }}
+                className="py-2.5 px-3 rounded-xl bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-750 text-stone-900 dark:text-stone-100 border border-stone-200 dark:border-stone-700 font-bold text-xs transition-all flex items-center justify-center gap-1.5 active:scale-[0.98]"
+              >
+                <span>🛠️ Enter as Admin</span>
+              </button>
+            </div>
+          </div>
 
           {/* Social Sign In Divider & Social SSO Buttons */}
           <div className="space-y-4">

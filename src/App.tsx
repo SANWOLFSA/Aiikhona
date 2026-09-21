@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Navigation from './components/Navigation';
 import Sidebar from './components/Sidebar';
+import PhonesPage from './components/PhonesPage';
 import RepairGuides from './components/RepairGuides';
 import GuideDetail from './components/GuideDetail';
 import DiagnosticTool from './components/DiagnosticTool';
@@ -15,23 +16,28 @@ import AdminDesk from './components/AdminDesk';
 import AuthModal from './components/AuthModal';
 import LandingPage from './components/LandingPage';
 import AiAssistantView from './components/AiAssistantView';
+import BlueprintViewer from './components/BlueprintViewer';
 import SettingsView from './components/SettingsView';
 import AboutView from './components/AboutView';
 import HelpView from './components/HelpView';
 import UserDatabaseManager from './components/UserDatabaseManager';
 import FileStorageManager from './components/FileStorageManager';
+import HomeFeed from './components/HomeFeed';
+import DeviceDirectoryView from './components/DeviceDirectoryView';
 import { storage } from './lib/storage';
+import { APP_THEMES, getNextThemeId } from './lib/theme';
 import { auth, db } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { initialGuides, initialParts, initialCourses, initialPosts, initialVerifications } from './data';
 import type { UserProfile, Guide, SparePart, Course, ForumPost, VerificationRequest } from './types';
 
 export default function App() {
   const [darkMode, setDarkMode] = useState<boolean>(() => storage.getDarkMode());
+  const [themeId, setThemeId] = useState<string>(() => storage.getAppTheme());
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => storage.getIsAuthenticated());
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => storage.getUserProfile());
-  const [activeTab, setActiveTab] = useState('guides');
+  const [activeTab, setActiveTab] = useState('home');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,6 +55,19 @@ export default function App() {
   const [selectedGuide, setSelectedGuide] = useState<Guide | null>(null);
   const [initialSearchQuery, setInitialSearchQuery] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const currentTheme = APP_THEMES[themeId] || APP_THEMES['obsidian-sapphire'];
+
+  const handleCycleTheme = () => {
+    const next = getNextThemeId(themeId);
+    setThemeId(next);
+    storage.setAppTheme(next);
+  };
+
+  const handleSelectTheme = (newThemeId: string) => {
+    setThemeId(newThemeId);
+    storage.setAppTheme(newThemeId);
+  };
   
   useEffect(() => {
     if (darkMode) {
@@ -211,6 +230,19 @@ export default function App() {
     }
   };
 
+  const logSearch = async (query: string, resultsCount: number) => {
+    try {
+      await addDoc(collection(db, 'searchLogs'), {
+        query,
+        resultsCount,
+        timestamp: serverTimestamp(),
+        userId: currentUser?.uid || 'anonymous'
+      });
+    } catch (e) {
+      console.error("Error logging search:", e);
+    }
+  };
+
   const handleSignOut = async () => {
     try {
       await signOut(auth);
@@ -240,11 +272,11 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100 transition-colors duration-200 flex flex-col font-sans antialiased">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200 flex flex-col font-sans antialiased">
       {isOfflineMode && (
-        <div className="bg-amber-400 text-stone-950 px-4 py-2 text-xs font-black flex items-center justify-center gap-2 shadow-sm z-50">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-wifi-off"><line x1="2" x2="22" y1="2" y2="22"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M2 8.82a15 15 0 0 1 4.17-2.65"/><path d="M10.66 5c4.01-.36 8.14.9 11.34 3.82"/><path d="M16 12.5a5 5 0 0 1 3 4.5"/><path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg>
-          <span>OFFLINE BENCH MODE ACTIVE: Browsing {savedGuideIds.length} cached guides from local storage.</span>
+        <div className="bg-slate-900 text-slate-200 border-b border-slate-800 px-4 py-2 text-xs font-semibold flex items-center justify-center gap-2 shadow-xs z-50">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><line x1="2" x2="22" y1="2" y2="22"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M2 8.82a15 15 0 0 1 4.17-2.65"/><path d="M10.66 5c4.01-.36 8.14.9 11.34 3.82"/><path d="M16 12.5a5 5 0 0 1 3 4.5"/><path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg>
+          <span className="tracking-wide">OFFLINE VAULT ACTIVE: Accessing {savedGuideIds.length} verified technical manuals cached locally.</span>
         </div>
       )}
 
@@ -262,6 +294,9 @@ export default function App() {
         onSelectTab={setActiveTab}
         activeTab={activeTab}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+        themeConfig={currentTheme}
+        onCycleTheme={handleCycleTheme}
+        logSearch={logSearch}
       />
       
       <Navigation 
@@ -273,6 +308,7 @@ export default function App() {
         }} 
         pendingVerificationsCount={pendingVerificationsCount}
         currentUser={currentUser}
+        themeConfig={currentTheme}
       />
       
       <div className="flex flex-1 min-h-0">
@@ -280,7 +316,7 @@ export default function App() {
           activeTab={activeTab} 
           onSelectTab={(tabId: string) => {
             if (tabId === 'admin' && currentUser?.email !== 'sbheko1@gmail.com' && currentUser?.email !== 'diy.electronicsa@gmail.com') return;
-            if (tabId === 'devices') setActiveTab('guides');
+            if (tabId === 'devices') setActiveTab('devices');
             else if (tabId === 'learning') setActiveTab('studies');
             else if (tabId === 'marketplace') setActiveTab('marketplace');
             else if (tabId === 'forum') setActiveTab('forum');
@@ -297,9 +333,35 @@ export default function App() {
           onCloseMobile={() => setIsSidebarOpen(false)}
           currentUser={currentUser}
           pendingVerificationsCount={pendingVerificationsCount}
+          themeConfig={currentTheme}
         />
         
-        <main className="flex-1 w-full pb-16 min-w-0">
+        <main className="flex-1 w-full pb-16 min-w-0 max-w-7xl mx-auto">
+          {activeTab === 'home' && (
+            <HomeFeed 
+              posts={posts} 
+              currentUser={currentUser} 
+              onAddPost={handleAddPost} 
+              onAddReply={handleAddReply} 
+              onToggleLike={handleToggleLike} 
+              themeConfig={currentTheme} 
+            />
+          )}
+          {activeTab === 'devices' && (
+            <DeviceDirectoryView 
+              savedGuideIds={savedGuideIds} 
+              onToggleSaveGuide={handleToggleSaveGuide}
+              onSourcePart={handleSourcePart}
+            />
+          )}
+          {activeTab === 'phones' && <PhonesPage themeConfig={currentTheme} onNavigateTo3D={() => setActiveTab('blueprint_viewer')} />}
+          {(activeTab === 'blueprint_viewer' || activeTab === '3d_viewer' || activeTab === 'social_annotator') && (
+            <BlueprintViewer 
+              themeConfig={currentTheme} 
+              currentUser={currentUser}
+              initialView={activeTab === 'social_annotator' ? 'annotator' : 'boardview'}
+            />
+          )}
           {activeTab === 'guides' && (
             <RepairGuides 
               guides={guides} 
@@ -380,6 +442,9 @@ export default function App() {
                 setCurrentUser(updatedUser);
                 storage.saveUserProfile(updatedUser);
               }}
+              themeId={themeId}
+              onSelectTheme={handleSelectTheme}
+              onCycleTheme={handleCycleTheme}
             />
           )}
 

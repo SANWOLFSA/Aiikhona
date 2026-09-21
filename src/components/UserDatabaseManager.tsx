@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Database, Upload, Calendar, User, Trash2, Plus, ShieldAlert, CheckCircle2, RefreshCw, Tv, Cpu, Wrench } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Database, Upload, Calendar, User, Trash2, Plus, ShieldAlert, CheckCircle2, RefreshCw, Tv, Cpu, Wrench, AlertCircle, Check, Sparkles, CheckCircle } from 'lucide-react';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, doc, getDocs, setDoc, deleteDoc, query, where, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
 
 interface MetadataRecord {
   id: string;
@@ -35,10 +35,51 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Metadata form state
+  // Metadata form state with interactive Validation UI
   const [fileName, setFileName] = useState('');
   const [fileType, setFileType] = useState('PDF Schematic');
   const [notes, setNotes] = useState('');
+  const [fileNameTouched, setFileNameTouched] = useState(false);
+  const [notesTouched, setNotesTouched] = useState(false);
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+
+  // Real-time validation computation
+  const validationRules = useMemo(() => {
+    const trimmed = fileName.trim();
+    const hasMinLength = trimmed.length >= 4;
+    const hasMaxLength = trimmed.length <= 80;
+    const hasValidChars = !/[<>:"/\\|?*]/.test(trimmed);
+    const hasValidExtension = /\.(pdf|brd|cad|bin|hex|json|schematic|dwg|txt)$/i.test(trimmed);
+    const isFileNameValid = hasMinLength && hasMaxLength && hasValidChars && hasValidExtension;
+    
+    const notesLengthValid = notes.length <= 150;
+    const isFormValid = isFileNameValid && notesLengthValid;
+
+    let errorHint = '';
+    if (trimmed.length === 0) {
+      errorHint = 'Filename cannot be blank.';
+    } else if (!hasMinLength) {
+      errorHint = `Too short (${trimmed.length}/4 characters minimum).`;
+    } else if (!hasValidChars) {
+      errorHint = 'Contains prohibited characters (< > : " / \\ | ? *).';
+    } else if (!hasValidExtension) {
+      errorHint = 'Must include an engineering extension (e.g., .brd, .pdf, .bin, .hex, .json).';
+    } else if (!hasMaxLength) {
+      errorHint = 'Filename exceeds 80 characters maximum.';
+    }
+
+    return {
+      trimmed,
+      hasMinLength,
+      hasMaxLength,
+      hasValidChars,
+      hasValidExtension,
+      isFileNameValid,
+      notesLengthValid,
+      isFormValid,
+      errorHint
+    };
+  }, [fileName, notes]);
   
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -106,7 +147,14 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
 
   const handleUploadMetadata = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fileName.trim()) return;
+    setFileNameTouched(true);
+    setNotesTouched(true);
+    setAttemptedSubmit(true);
+
+    if (!validationRules.isFormValid) {
+      setErrorMsg('Please address the highlighted validation requirements before saving.');
+      return;
+    }
 
     const uid = currentUser?.id || auth.currentUser?.uid || 'guest_user';
     const email = currentUser?.email || auth.currentUser?.email || 'technician@diy.org';
@@ -133,6 +181,9 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
       setSuccessMsg('Metadata record successfully saved to Firestore database!');
       setFileName('');
       setNotes('');
+      setFileNameTouched(false);
+      setNotesTouched(false);
+      setAttemptedSubmit(false);
       await fetchRecords();
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (error) {
@@ -276,56 +327,277 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
         </div>
       ) : (
         <div className="space-y-8 animate-fadeIn">
-          {/* Upload Form Card */}
           <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 shadow-sm space-y-6">
-            <div className="flex items-center gap-2">
-              <Upload className="w-5 h-5 text-amber-500" />
-              <h3 className="text-sm font-black text-stone-900 dark:text-stone-100">Log New Metadata & Upload Date</h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-stone-100 dark:border-stone-800/80">
+              <div className="flex items-center gap-2">
+                <Upload className="w-5 h-5 text-amber-500" />
+                <h3 className="text-sm font-black text-stone-900 dark:text-stone-100">Log New Metadata & Upload Date</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-colors ${
+                  validationRules.isFormValid 
+                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                    : (fileNameTouched || attemptedSubmit)
+                      ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'
+                      : 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 border border-stone-200 dark:border-stone-700'
+                }`}>
+                  {validationRules.isFormValid ? (
+                    <>
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>Form Ready to Submit</span>
+                    </>
+                  ) : (fileNameTouched || attemptedSubmit) ? (
+                    <>
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>Validation Requirements Pending</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Live Validation Active</span>
+                    </>
+                  )}
+                </span>
+              </div>
             </div>
 
-            <form onSubmit={handleUploadMetadata} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-stone-700 dark:text-stone-300">File or Schematic Name</label>
-                <input 
-                  type="text" 
-                  value={fileName}
-                  onChange={e => setFileName(e.target.value)}
-                  placeholder="e.g., iPhone_14_Pro_Boardview.brd"
-                  required
-                  className="w-full px-4 py-3 rounded-xl text-xs bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                />
+            <form onSubmit={handleUploadMetadata} className="space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* File or Schematic Name with Validation UI */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-stone-700 dark:text-stone-300 flex items-center gap-1">
+                      <span>File or Schematic Name</span>
+                      <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-stone-400 font-mono">
+                      {fileName.length}/80 chars
+                    </span>
+                  </div>
+
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      value={fileName}
+                      onChange={e => {
+                        setFileName(e.target.value);
+                        if (!fileNameTouched) setFileNameTouched(true);
+                      }}
+                      onBlur={() => setFileNameTouched(true)}
+                      placeholder="e.g., Sony_KDL48_Tcon_Boardview.brd"
+                      className={`w-full px-4 py-3 pr-10 rounded-xl text-xs transition-all border ${
+                        (fileNameTouched || attemptedSubmit)
+                          ? validationRules.isFileNameValid
+                            ? 'bg-emerald-50/20 dark:bg-emerald-950/20 border-emerald-500 text-stone-900 dark:text-stone-100 focus:ring-2 focus:ring-emerald-400'
+                            : 'bg-rose-50/20 dark:bg-rose-950/20 border-rose-500 text-stone-900 dark:text-stone-100 focus:ring-2 focus:ring-rose-400'
+                          : 'bg-stone-50 dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400'
+                      }`}
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      {(fileNameTouched || attemptedSubmit) && (
+                        validationRules.isFileNameValid ? (
+                          <CheckCircle className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in-75" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 text-rose-500 animate-in fade-in zoom-in-75" />
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Inline feedback message */}
+                  {(fileNameTouched || attemptedSubmit) && (
+                    <div className="animate-in fade-in slide-in-from-top-1 duration-150">
+                      {!validationRules.isFileNameValid ? (
+                        <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{validationRules.errorHint}</span>
+                        </p>
+                      ) : (
+                        <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5 shrink-0" />
+                          <span>Valid filename with authorized engineering extension</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Quick extension append pills */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <span className="text-[10px] text-stone-400 font-medium mr-1">Quick Extension:</span>
+                    {['.brd', '.pdf', '.bin', '.hex', '.json'].map(ext => (
+                      <button
+                        type="button"
+                        key={ext}
+                        onClick={() => {
+                          const base = fileName.replace(/\.[^/.]+$/, "");
+                          setFileName((base || 'device_schematic') + ext);
+                          setFileNameTouched(true);
+                        }}
+                        className="px-2 py-0.5 rounded text-[10px] font-mono bg-stone-100 dark:bg-stone-800 hover:bg-amber-100 dark:hover:bg-amber-950/60 text-stone-700 dark:text-stone-300 hover:text-amber-800 dark:hover:text-amber-300 border border-stone-200 dark:border-stone-700 transition-colors cursor-pointer"
+                      >
+                        +{ext}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Data Category Type */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-stone-700 dark:text-stone-300 flex items-center justify-between">
+                    <span>Data Category Type</span>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                      <Check className="w-3 h-3" /> Auto-classified
+                    </span>
+                  </label>
+                  <select 
+                    value={fileType}
+                    onChange={e => setFileType(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl text-xs bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  >
+                    <option value="PDF Schematic">PDF Schematic (Circuit Maps)</option>
+                    <option value="Boardview / CAD">Boardview / CAD (.brd / .cad)</option>
+                    <option value="Diagnostic Telemetry">Diagnostic Telemetry (.bin / .hex firmware)</option>
+                    <option value="Account Backup">Account Backup (JSON / config)</option>
+                  </select>
+                </div>
+
+                {/* Notes & Account Info */}
+                <div className="sm:col-span-2 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-stone-700 dark:text-stone-300">
+                      Notes & Technician Memo
+                    </label>
+                    <span className={`text-[10px] font-mono ${
+                      notes.length > 140 
+                        ? 'text-rose-500 font-bold' 
+                        : notes.length > 100 
+                          ? 'text-amber-500' 
+                          : 'text-stone-400'
+                    }`}>
+                      {notes.length}/150 characters
+                    </span>
+                  </div>
+                  <input 
+                    type="text" 
+                    value={notes}
+                    maxLength={150}
+                    onChange={e => {
+                      setNotes(e.target.value);
+                      if (!notesTouched) setNotesTouched(true);
+                    }}
+                    onBlur={() => setNotesTouched(true)}
+                    placeholder="e.g., Uploaded by Master Technician for regional motherboard repair logging"
+                    className="w-full px-4 py-3 rounded-xl text-xs bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-stone-700 dark:text-stone-300">Data Category Type</label>
-                <select 
-                  value={fileType}
-                  onChange={e => setFileType(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl text-xs bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                >
-                  <option value="PDF Schematic">PDF Schematic</option>
-                  <option value="Boardview / CAD">Boardview / CAD</option>
-                  <option value="Diagnostic Telemetry">Diagnostic Telemetry</option>
-                  <option value="Account Backup">Account Backup</option>
-                </select>
+              {/* Real-time Validation Checklist Chips */}
+              <div className="p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-950/60 border border-stone-200 dark:border-stone-800/80 space-y-2.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-bold text-stone-700 dark:text-stone-300 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Real-Time Validation Criteria</span>
+                  </span>
+                  <span className="text-[10px] text-stone-400">
+                    {[
+                      validationRules.hasMinLength,
+                      validationRules.hasValidExtension,
+                      validationRules.hasValidChars,
+                      validationRules.notesLengthValid
+                    ].filter(Boolean).length}/4 Passed
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className={`p-2 rounded-xl text-[11px] font-semibold flex items-center gap-2 border transition-all ${
+                    validationRules.hasMinLength 
+                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20' 
+                      : (fileNameTouched || attemptedSubmit)
+                        ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20'
+                        : 'bg-stone-100 dark:bg-stone-900 text-stone-500 border-stone-200 dark:border-stone-800'
+                  }`}>
+                    {validationRules.hasMinLength ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    ) : (
+                      <div className="w-2 h-2 rounded-full bg-stone-400 shrink-0" />
+                    )}
+                    <span className="truncate">Min 4 chars</span>
+                  </div>
+
+                  <div className={`p-2 rounded-xl text-[11px] font-semibold flex items-center gap-2 border transition-all ${
+                    validationRules.hasValidExtension 
+                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20' 
+                      : (fileNameTouched || attemptedSubmit)
+                        ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20'
+                        : 'bg-stone-100 dark:bg-stone-900 text-stone-500 border-stone-200 dark:border-stone-800'
+                  }`}>
+                    {validationRules.hasValidExtension ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    ) : (
+                      <div className="w-2 h-2 rounded-full bg-stone-400 shrink-0" />
+                    )}
+                    <span className="truncate">Valid Extension</span>
+                  </div>
+
+                  <div className={`p-2 rounded-xl text-[11px] font-semibold flex items-center gap-2 border transition-all ${
+                    validationRules.hasValidChars 
+                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20' 
+                      : (fileNameTouched || attemptedSubmit)
+                        ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20'
+                        : 'bg-stone-100 dark:bg-stone-900 text-stone-500 border-stone-200 dark:border-stone-800'
+                  }`}>
+                    {validationRules.hasValidChars ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    ) : (
+                      <div className="w-2 h-2 rounded-full bg-stone-400 shrink-0" />
+                    )}
+                    <span className="truncate">Clean Filename</span>
+                  </div>
+
+                  <div className={`p-2 rounded-xl text-[11px] font-semibold flex items-center gap-2 border transition-all ${
+                    validationRules.notesLengthValid 
+                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20' 
+                      : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20'
+                  }`}>
+                    {validationRules.notesLengthValid ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    ) : (
+                      <div className="w-2 h-2 rounded-full bg-stone-400 shrink-0" />
+                    )}
+                    <span className="truncate">&lt; 150 chars</span>
+                  </div>
+                </div>
               </div>
 
-              <div className="sm:col-span-2 space-y-1.5">
-                <label className="text-xs font-bold text-stone-700 dark:text-stone-300">Notes & Account Info</label>
-                <input 
-                  type="text" 
-                  value={notes}
-                  onChange={e => setNotes(e.target.value)}
-                  placeholder="e.g., Uploaded by Master Technician for regional motherboard repair logging"
-                  className="w-full px-4 py-3 rounded-xl text-xs bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                />
-              </div>
+              {/* Submission CTA Row */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                <div>
+                  {!validationRules.isFormValid && (fileNameTouched || attemptedSubmit) ? (
+                    <p className="text-xs text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>Complete the missing criteria to enable saving.</span>
+                    </p>
+                  ) : validationRules.isFormValid ? (
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
+                      <CheckCircle className="w-4 h-4 shrink-0" />
+                      <span>All input fields validated and ready for cloud sync.</span>
+                    </p>
+                  ) : (
+                    <p className="text-xs text-stone-400">
+                      Enter an engineering file name to begin validation.
+                    </p>
+                  )}
+                </div>
 
-              <div className="sm:col-span-2 flex justify-end pt-2">
                 <button
                   type="submit"
-                  disabled={isSubmitting || !fileName.trim()}
-                  className="bg-amber-400 hover:bg-amber-500 disabled:opacity-50 text-stone-950 font-black px-6 py-3 rounded-xl text-xs flex items-center gap-2 shadow-md transition-transform active:scale-95 cursor-pointer"
+                  disabled={isSubmitting || !validationRules.isFormValid}
+                  className={`px-6 py-3 rounded-xl text-xs font-black flex items-center gap-2 shadow-md transition-all cursor-pointer ${
+                    validationRules.isFormValid
+                      ? 'bg-amber-400 hover:bg-amber-500 text-stone-950 active:scale-95'
+                      : 'bg-stone-200 dark:bg-stone-800 text-stone-400 dark:text-stone-600 cursor-not-allowed opacity-60'
+                  }`}
                 >
                   <Plus className="w-4 h-4" />
                   <span>{isSubmitting ? 'Saving to Firestore...' : 'Store Metadata & Upload Date'}</span>

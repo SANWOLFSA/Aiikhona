@@ -12,7 +12,14 @@ import {
   doc, 
   setDoc, 
   getDoc,
-  getDocFromServer
+  getDocFromServer,
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  getDocs,
+  onSnapshot,
+  orderBy
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 const firebaseConfig = {
@@ -29,6 +36,7 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
+export { collection, addDoc, serverTimestamp, query, getDocs, onSnapshot, orderBy };
 
 // Helper error handler adhering strictly to standard JSON error guidelines in SKILL.md
 export enum OperationType {

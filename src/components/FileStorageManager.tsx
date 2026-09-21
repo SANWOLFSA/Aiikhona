@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Folder, Upload, FileText, Download, Trash2, Eye, ShieldAlert, CheckCircle2, RefreshCw, File } from 'lucide-react';
+import { Folder, Upload, FileText, Download, Trash2, Eye, ShieldAlert, CheckCircle2, RefreshCw, File, AlertCircle, Check } from 'lucide-react';
 import { db, auth, storage, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, doc, getDocs, setDoc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
@@ -20,9 +20,54 @@ export default function FileStorageManager({ currentUser }: { currentUser: any }
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileValidationStatus, setFileValidationStatus] = useState<{ isValid: boolean; message: string; sizeMb: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const validateFile = (file: File | null) => {
+    if (!file) {
+      setFileValidationStatus(null);
+      return false;
+    }
+
+    const sizeMb = +(file.size / (1024 * 1024)).toFixed(2);
+    const maxMb = 25;
+    const allowedExtensions = ['.pdf', '.brd', '.cad', '.bin', '.hex', '.json', '.schematic', '.dwg', '.png', '.jpg', '.jpeg', '.zip', '.tar', '.gz'];
+    const fileNameLower = file.name.toLowerCase();
+    const hasAllowedExt = allowedExtensions.some(ext => fileNameLower.endsWith(ext));
+
+    if (sizeMb > maxMb) {
+      setFileValidationStatus({
+        isValid: false,
+        message: `File exceeds limit of ${maxMb}MB (selected: ${sizeMb}MB). Please select a compressed file.`,
+        sizeMb
+      });
+      return false;
+    }
+
+    if (!hasAllowedExt) {
+      setFileValidationStatus({
+        isValid: false,
+        message: `Unrecognized extension. Allowed types include .pdf, .brd, .cad, .bin, .hex, .png, .zip`,
+        sizeMb
+      });
+      return false;
+    }
+
+    setFileValidationStatus({
+      isValid: true,
+      message: `Verified: ${sizeMb} MB • Ready for cloud upload`,
+      sizeMb
+    });
+    return true;
+  };
+
+  const handleSelectFile = (file: File | null) => {
+    setSelectedFile(file);
+    validateFile(file);
+  };
 
   const fetchFiles = async () => {
     const uid = currentUser?.id || auth.currentUser?.uid;
@@ -163,37 +208,125 @@ export default function FileStorageManager({ currentUser }: { currentUser: any }
         </div>
       )}
 
-      {/* Upload Box */}
-      <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 shadow-sm space-y-6">
-        <div className="flex items-center gap-2">
-          <Upload className="w-5 h-5 text-amber-500" />
-          <h3 className="text-sm font-black text-stone-900 dark:text-stone-100">Upload New File</h3>
+      {/* Upload Box with Validation UI */}
+      <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2">
+          <div className="flex items-center gap-2">
+            <Upload className="w-5 h-5 text-amber-500" />
+            <h3 className="text-sm font-black text-stone-900 dark:text-stone-100">Upload New Engineering Asset</h3>
+          </div>
+          <span className="text-[11px] font-bold text-stone-400">
+            Storage Engine: Firebase Cloud Storage (25MB Max)
+          </span>
         </div>
 
         <form onSubmit={handleFileUpload} className="space-y-4">
-          <div className="border-2 border-dashed border-stone-300 dark:border-stone-700 rounded-2xl p-8 text-center space-y-3 hover:border-amber-400 transition-colors bg-stone-50 dark:bg-stone-950/40">
+          <div 
+            onDragOver={e => {
+              e.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={e => {
+              e.preventDefault();
+              setIsDragging(false);
+              const file = e.dataTransfer.files?.[0] || null;
+              handleSelectFile(file);
+            }}
+            className={`border-2 border-dashed rounded-2xl p-7 text-center space-y-3 transition-all ${
+              isDragging
+                ? 'border-amber-400 bg-amber-400/5 ring-4 ring-amber-400/10'
+                : fileValidationStatus
+                  ? fileValidationStatus.isValid
+                    ? 'border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/20'
+                    : 'border-rose-500 bg-rose-50/20 dark:bg-rose-950/20'
+                  : 'border-stone-300 dark:border-stone-700 hover:border-amber-400 bg-stone-50 dark:bg-stone-950/40'
+            }`}
+          >
             <input 
               type="file" 
               id="fileInput"
-              onChange={e => setSelectedFile(e.target.files?.[0] || null)}
+              onChange={e => handleSelectFile(e.target.files?.[0] || null)}
               className="hidden"
             />
             <label htmlFor="fileInput" className="cursor-pointer flex flex-col items-center gap-2">
-              <div className="w-12 h-12 rounded-full bg-amber-400/10 text-amber-500 flex items-center justify-center">
-                <File className="w-6 h-6" />
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${
+                fileValidationStatus
+                  ? fileValidationStatus.isValid
+                    ? 'bg-emerald-500/15 text-emerald-500'
+                    : 'bg-rose-500/15 text-rose-500'
+                  : 'bg-amber-400/10 text-amber-500'
+              }`}>
+                {fileValidationStatus ? (
+                  fileValidationStatus.isValid ? (
+                    <CheckCircle2 className="w-6 h-6" />
+                  ) : (
+                    <AlertCircle className="w-6 h-6" />
+                  )
+                ) : (
+                  <File className="w-6 h-6" />
+                )}
               </div>
-              <span className="text-xs font-bold text-stone-800 dark:text-stone-200">
-                {selectedFile ? selectedFile.name : 'Click to select a file or drag & drop here'}
-              </span>
-              <span className="text-[11px] text-stone-400">Supports PDFs, images, schematics, boardviews, archives (Max 25MB)</span>
+
+              <div>
+                <span className="text-xs font-bold text-stone-800 dark:text-stone-200">
+                  {selectedFile ? selectedFile.name : 'Click to select a file or drag & drop here'}
+                </span>
+                <p className="text-[11px] text-stone-400 mt-0.5">
+                  PDF, Boardview (.brd/.cad), Firmware (.bin/.hex), Schematics, Archives
+                </p>
+              </div>
             </label>
           </div>
 
-          <div className="flex justify-end">
+          {/* Validation Feedback Banner */}
+          {fileValidationStatus && (
+            <div className={`p-3 rounded-2xl text-xs font-medium border flex items-center justify-between animate-in fade-in slide-in-from-top-1 duration-150 ${
+              fileValidationStatus.isValid
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                : 'bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400'
+            }`}>
+              <div className="flex items-center gap-2">
+                {fileValidationStatus.isValid ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                )}
+                <span>{fileValidationStatus.message}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleSelectFile(null)}
+                className="text-[11px] font-bold underline hover:opacity-80 cursor-pointer ml-2"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+            <div className="text-xs text-stone-500 dark:text-stone-400">
+              {fileValidationStatus?.isValid ? (
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                  <Check className="w-3.5 h-3.5" /> File passed integrity & size check
+                </span>
+              ) : selectedFile ? (
+                <span className="text-rose-500 font-semibold flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5" /> Please choose a valid file format under 25MB
+                </span>
+              ) : (
+                <span>No file chosen yet</span>
+              )}
+            </div>
+
             <button
               type="submit"
-              disabled={isUploading || !selectedFile}
-              className="bg-amber-400 hover:bg-amber-500 disabled:opacity-50 text-stone-950 font-black px-6 py-3 rounded-xl text-xs flex items-center gap-2 shadow-md transition-transform active:scale-95 cursor-pointer"
+              disabled={isUploading || !selectedFile || !fileValidationStatus?.isValid}
+              className={`px-6 py-3 rounded-xl text-xs font-black flex items-center gap-2 shadow-md transition-all cursor-pointer ${
+                fileValidationStatus?.isValid
+                  ? 'bg-amber-400 hover:bg-amber-500 text-stone-950 active:scale-95'
+                  : 'bg-stone-200 dark:bg-stone-800 text-stone-400 dark:text-stone-600 cursor-not-allowed opacity-60'
+              }`}
             >
               <Upload className="w-4 h-4" />
               <span>{isUploading ? 'Uploading to Cloud Storage...' : 'Upload File'}</span>

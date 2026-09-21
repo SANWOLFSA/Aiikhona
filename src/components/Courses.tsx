@@ -62,13 +62,13 @@ export default function Courses({
                 <span>Theory & Exam Portal</span>
               </div>
               <h1 className="text-2xl sm:text-4xl font-black text-stone-900 dark:text-stone-100 tracking-tight">Structured Studies & Circuit Theory Examinations</h1>
-              <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-400">
+              <p className="text-sm sm:text-base text-stone-700 dark:text-stone-300 leading-relaxed">
                 Bridge the gap between repair and engineering. Learn Ohm's Law, standby power rail sequence, oscilloscope trigger configurations, and earn certified technician badges.
               </p>
             </div>
             <div className="p-4 rounded-2xl bg-stone-50 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 text-xs space-y-1">
-              <span className="font-bold text-stone-800 dark:text-stone-200 block">Tech Certifications</span>
-              <p className="text-stone-500 text-[11px]">
+              <span className="font-bold text-stone-900 dark:text-stone-100 block">Tech Certifications</span>
+              <p className="text-stone-700 dark:text-stone-300 text-xs">
                 Unlock advanced moderator tools on the community forum by completing certified theory masterclasses.
               </p>
             </div>
@@ -77,28 +77,28 @@ export default function Courses({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {courses.map(course => (
               <div key={course.id} className="bg-white dark:bg-stone-900 rounded-3xl border border-stone-200 dark:border-stone-800 p-6 shadow-xs flex flex-col justify-between space-y-5">
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 uppercase tracking-wider">{course.category}</span>
-                    <span className="text-xs text-stone-500 font-medium">{course.lessonsCount} lessons • {course.durationHours} hrs</span>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 uppercase tracking-wider">{course.category}</span>
+                    <span className="text-xs text-stone-600 dark:text-stone-300 font-semibold">{course.lessonsCount} lessons • {course.durationHours} hrs</span>
                   </div>
-                  <h3 className="text-xl font-black text-stone-900 dark:text-stone-100 leading-snug">{course.title}</h3>
-                  <p className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed">{course.description}</p>
+                  <h3 className="text-xl font-black text-stone-950 dark:text-stone-50 leading-snug">{course.title}</h3>
+                  <p className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">{course.description}</p>
                   
                   <div className="pt-2">
-                    <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block mb-1.5">Skills You Will Acquire:</span>
+                    <span className="text-xs font-bold text-stone-700 dark:text-stone-200 uppercase tracking-wider block mb-1.5">Skills You Will Acquire:</span>
                     <div className="flex flex-wrap gap-1">
                       {course.skillsAcquired.map((skill, idx) => (
-                        <span key={idx} className="text-[10px] px-2.5 py-1 rounded bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 font-medium">✓ {skill}</span>
+                        <span key={idx} className="text-xs px-2.5 py-1 rounded bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-stone-100 font-medium">✓ {skill}</span>
                       ))}
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-stone-100 dark:border-stone-800 flex items-center justify-between">
+                <div className="pt-4 border-t border-stone-200 dark:border-stone-800 flex items-center justify-between">
                   <div>
-                    <span className="text-[10px] text-stone-400 block">Instructor</span>
-                    <span className="text-xs font-bold text-stone-700 dark:text-stone-300">{course.instructor}</span>
+                    <span className="text-xs text-stone-500 dark:text-stone-400 block">Instructor</span>
+                    <span className="text-sm font-bold text-stone-900 dark:text-stone-100">{course.instructor}</span>
                   </div>
                   <button 
                     onClick={() => handleStartCourse(course)}
@@ -181,7 +181,7 @@ export default function Courses({
                       key={oIdx}
                       type="button"
                       onClick={() => handleSelectAnswer(oIdx)}
-                      className={`w-full p-3.5 rounded-xl border text-xs text-left font-medium transition-all ${selectedAnswerIndex === oIdx ? "bg-amber-400 border-amber-500 text-stone-950 font-bold shadow-xs" : "bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-amber-400"}`}
+                      className={`w-full p-4 rounded-xl border text-sm text-left font-medium transition-all ${selectedAnswerIndex === oIdx ? "bg-amber-400 border-amber-500 text-stone-950 font-bold shadow-xs" : "bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-200 hover:border-amber-400"}`}
                     >
                       {opt}
                     </button>
@@ -212,7 +212,7 @@ export default function Courses({
                         <span className={`font-bold ${quizScore ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}`}>
                           {quizScore ? "Correct Answer!" : "Incorrect Answer, try reviewing Ohm's Law principles."}
                         </span>
-                        <p className="text-stone-500 mt-1 leading-relaxed">{selectedCourse.modules[activeModuleIndex].quizQuestion.explanation}</p>
+                        <p className="text-sm text-stone-700 dark:text-stone-300 mt-2 leading-relaxed">{selectedCourse.modules[activeModuleIndex].quizQuestion.explanation}</p>
                       </div>
                     </div>
 

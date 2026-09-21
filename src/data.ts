@@ -2,6 +2,65 @@ import { Guide, SparePart, Course, ForumPost, VerificationRequest } from './type
 
 export const initialGuides: Guide[] = [
   {
+    id: "guide_hard_reset",
+    title: "Factory Reset via Recovery Mode (Bypass Frozen Screen)",
+    deviceCategory: "Smartphones",
+    deviceModel: "Android Devices (Universal)",
+    issueType: "Frozen Screen / Bootloop / Forgotten Passcode",
+    difficulty: "Beginner",
+    estimatedTimeMinutes: 5,
+    author: {
+      name: "SANWOLF System",
+      avatar: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=150&auto=format&fit=crop&q=80",
+      badge: "AI Hardware Assistant",
+      reputation: 9999
+    },
+    thumbnailUrl: "https://images.unsplash.com/photo-1598327105666-5b89351cb31b?w=800&auto=format&fit=crop&q=80",
+    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+    views: 45000,
+    likes: 3200,
+    eWasteSavedKg: 0.15,
+    toolsRequired: [
+      "No specialized tools required (Hardware buttons only)"
+    ],
+    partsRequired: [],
+    steps: [
+      {
+        stepNumber: 1,
+        title: "Power Off Completely",
+        description: "Ensure the device is powered down. If the screen is frozen, press and hold the Power button for 10-15 seconds until the screen goes black.",
+        safetyWarning: "FRP & Activation Lock Warning: A hard reset wipes all data. If this device is linked to a Google account, you will still need the original password to bypass Activation Lock upon rebooting.",
+      },
+      {
+        stepNumber: 2,
+        title: "Hold Button Combo",
+        description: "Press and hold the Volume Up + Power buttons simultaneously (Some models require Volume Down instead).",
+      },
+      {
+        stepNumber: 3,
+        title: "Release on Boot Logo",
+        description: "As soon as the manufacturer logo appears on the screen, release both buttons. You should now see the Android Recovery menu.",
+        proTip: "If the device shows 'No Command' with an Android mascot, hold Power and press Volume Up once to access the hidden menu."
+      },
+      {
+        stepNumber: 4,
+        title: "Navigate to Factory Reset",
+        description: "The touch screen will not work here. Use the Volume buttons to scroll down and highlight 'Wipe data/factory reset'.",
+      },
+      {
+        stepNumber: 5,
+        title: "Confirm and Wipe",
+        description: "Press the Power button to select. Scroll to confirm by selecting 'Factory data reset' or 'Yes'.",
+      },
+      {
+        stepNumber: 6,
+        title: "Reboot System",
+        description: "Once the wipe process says 'Data wipe complete' at the bottom, select 'Reboot system now'. The first boot may take 5-10 minutes.",
+      }
+    ],
+    publishedAt: "2026-09-17"
+  },
+  {
     id: "guide_1",
     title: "Nintendo Switch M92T36 Power IC Replacement & Short-Circuit Diagnosis",
     deviceCategory: "Gaming Consoles",
@@ -245,6 +304,390 @@ export const initialGuides: Guide[] = [
       }
     ],
     publishedAt: "2026-08-04"
+  },
+  {
+    id: "guide_drone_avionics",
+    title: "Drone Flight Controller & 4-in-1 ESC Stack Internal Electronics Blueprint",
+    deviceCategory: "Drones & Robotics",
+    deviceModel: "FPV Freestyle Quadcopters & UAVs",
+    issueType: "Motor Twitch / Desync / No Gyro Telemetry / ELRS Receiver Unbound",
+    difficulty: "Intermediate",
+    estimatedTimeMinutes: 35,
+    author: {
+      name: "Alex V.",
+      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+      badge: "Avionics Specialist",
+      reputation: 3950
+    },
+    thumbnailUrl: "https://images.unsplash.com/photo-1527977966376-1c8408f9f108?w=800&auto=format&fit=crop&q=80",
+    views: 22100,
+    likes: 1890,
+    eWasteSavedKg: 0.65,
+    toolsRequired: [
+      "Smoke Stopper Current-Limiting Fuse (XT60)",
+      "Soldering Iron (380°C chisel tip for ground plane)",
+      "Digital Multimeter",
+      "Betaflight Configurator USB Interface"
+    ],
+    partsRequired: [
+      { name: "Low-ESR 35V 1000uF Electrolytic Capacitor", partNumber: "RUBY-35V1000", priceApprox: "$1.80", partId: "part_cap_drone" }
+    ],
+    steps: [
+      {
+        stepNumber: 1,
+        title: "Motor & 4-in-1 ESC Phase Continuity",
+        description: "Check resistance across all 3 motor phases (U, V, W) on each of the 4 brushless motors. Resistance should be identical (typically 0.1Ω to 0.3Ω). Any infinite reading indicates a broken motor winding.",
+        multimeterCheck: {
+          probeRed: "Motor Phase U",
+          probeBlack: "Motor Phase V / W",
+          expectedValue: "0.15Ω - 0.25Ω (Symmetrical)",
+          mode: "Resistance"
+        }
+      },
+      {
+        stepNumber: 2,
+        title: "5V & 9V Regulator Rail Diagnostic",
+        description: "Power up with a Smoke Stopper. Probe the 5V BEC (Receiver/Camera) and 9V BEC (VTX). If 5V drops below 4.7V, unhook the ELRS receiver or camera to isolate the short.",
+        multimeterCheck: {
+          probeRed: "5V BEC Pad",
+          probeBlack: "GND Solder Pad",
+          expectedValue: "4.95V - 5.15V DC",
+          mode: "Voltage"
+        }
+      },
+      {
+        stepNumber: 3,
+        title: "ELRS 2.4GHz Receiver Telemetry & Binding",
+        description: "Verify TX/RX UART cross-wiring (ELRS TX to FC RX1, ELRS RX to FC TX1). Power cycle 3 times rapidly to enter WiFi binding mode and flash official ExpressLRS firmware."
+      }
+    ],
+    publishedAt: "2026-09-17"
+  },
+  {
+    id: "guide_sony_2blink",
+    title: "Sony Bravia 2-Blink Protection Error: DC_det Voltage Divider Repair",
+    deviceCategory: "TVs & Monitors",
+    deviceModel: "Sony Bravia EX650 / HX750 / R412 / W652 Series",
+    issueType: "Red Standby LED Blinks 2 Times in Loop / Shuts Down in 2 Seconds",
+    difficulty: "Advanced",
+    estimatedTimeMinutes: 40,
+    author: {
+      name: "Dave Kinkade",
+      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+      badge: "Display Panel Specialist",
+      reputation: 4120
+    },
+    thumbnailUrl: "https://images.unsplash.com/photo-1593784991095-a205069470b6?w=800&auto=format&fit=crop&q=80",
+    views: 31400,
+    likes: 2780,
+    eWasteSavedKg: 12.0,
+    toolsRequired: [
+      "Stereo Inspection Microscope",
+      "Digital Multimeter with Needle Probes",
+      "Micro Soldering Iron with Fine Conical Tip",
+      "SMD 0402 Precision Resistor Kit (1% tolerance)"
+    ],
+    partsRequired: [
+      { name: "Precision 100kΩ / 10kΩ 0402 SMD Resistors", partNumber: "RC0402FR-07100KL", priceApprox: "$0.10", partId: "part_res_0402" }
+    ],
+    steps: [
+      {
+        stepNumber: 1,
+        title: "Identify Chassis Reference in DC_det Matrix",
+        description: "Check model number: EX650/HX750 expects 1.5V DC_det on 12V rail; R412/R402/W652 expects 2.1V DC_det on 19.5V adapter rail.",
+        safetyWarning: "Never jumper DC_det directly to 3.3V or 5V; excessive voltage will permanently destroy the Sony video processing MCU."
+      },
+      {
+        stepNumber: 2,
+        title: "Dynamic DC_det Voltage Probing at Power-On",
+        description: "Connect black probe to chassis metal. Touch red probe to the DC_det test point. Press TV power button: watch the multimeter display. If it stays at 0.4V - 0.9V before tripping 2 blinks, the upper divider resistor is open.",
+        multimeterCheck: {
+          probeRed: "DC_det Test Pad (e.g. R412 divider junction)",
+          probeBlack: "Chassis Ground",
+          expectedValue: "1.50V or 2.10V (Stable)",
+          mode: "Voltage"
+        }
+      },
+      {
+        stepNumber: 3,
+        title: "Replace Drifted High-Megohm SMD Resistors",
+        detail: "Desolder the drifted upper resistor (often 100kΩ-200kΩ) and replace with a 1% metal film SMD resistor to restore the precise nominal bias voltage. Power on and verify TV boots into Bravia home menu."
+      }
+    ],
+    publishedAt: "2026-09-16"
+  },
+  {
+    id: "guide_microsd_spi",
+    title: "Micro SD Card Forensic Data Recovery via Direct SPI Wire Harness",
+    deviceCategory: "Storage & Flash",
+    deviceModel: "SanDisk / Samsung / Kingston Micro SD Cards",
+    issueType: "Card Not Recognized / Corrupt Partition / 0 Bytes Capacity",
+    difficulty: "Expert",
+    estimatedTimeMinutes: 60,
+    author: {
+      name: "Marcus Chen",
+      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+      badge: "Circuit Board Engineer",
+      reputation: 4890
+    },
+    thumbnailUrl: "https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=800&auto=format&fit=crop&q=80",
+    views: 19800,
+    likes: 1650,
+    eWasteSavedKg: 0.05,
+    toolsRequired: [
+      "38 AWG Enamelled Copper Magnet Wire",
+      "Stereo Trinocular Microscope (20x-40x)",
+      "Soldering Iron (280°C with 0.2mm needle tip)",
+      "Arduino / FTDI FT232H USB-to-SPI Bridge",
+      "GNU ddrescue Forensic Sector Imager"
+    ],
+    partsRequired: [
+      { name: "3.3V Logic Level Shifter (74LVC245)", partNumber: "74LVC245AN", priceApprox: "$1.20", partId: "part_shifter" }
+    ],
+    steps: [
+      {
+        stepNumber: 1,
+        title: "Microscope Pad Preparation & Wire Jumpering",
+        description: "Under the microscope, apply a tiny speck of tacky flux to pins 2 (CS), 3 (CMD/MOSI), 4 (VDD 3.3V), 5 (CLK), 6 (GND), and 7 (DAT0/MISO). Solder fine 38 AWG enamel jumpers.",
+        safetyWarning: "STRICT: Do NOT feed 5V to the MicroSD card VDD or logic lines. 5V will instantly fry the internal NAND flash controller."
+      },
+      {
+        stepNumber: 2,
+        title: "SPI Bus Pin Mapping",
+        description: "Wire DAT3/CS to Arduino Pin 10, CMD to D11 (MOSI), CLK to D13 (SCK), DAT0 to D12 (MISO), VDD to 3.3V regulator, and VSS to GND.",
+        multimeterCheck: {
+          probeRed: "MicroSD Pin 4 (VDD)",
+          probeBlack: "MicroSD Pin 6 (GND)",
+          expectedValue: "3.30V ± 0.05V",
+          mode: "Voltage"
+        }
+      },
+      {
+        stepNumber: 3,
+        title: "Raw Sector Extraction with ddrescue",
+        description: "Initialize SPI at 250kHz. Stream raw 512-byte blocks into a raw disk image (.IMG) using ddrescue with multi-pass bad sector recovery."
+      }
+    ],
+    publishedAt: "2026-09-15"
+  },
+  {
+    id: "guide_bios_pw_bypass",
+    title: "PC & Laptop Motherboard BIOS Forgotten Password Removal (3 Methods)",
+    deviceCategory: "Laptops & PCs",
+    deviceModel: "Dell, HP, Lenovo, ASUS & MSI Motherboards",
+    issueType: "Locked by BIOS / UEFI Supervisor Password at Power-On",
+    difficulty: "Beginner",
+    estimatedTimeMinutes: 20,
+    author: {
+      name: "Marcus Chen",
+      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+      badge: "Circuit Board Engineer",
+      reputation: 4890
+    },
+    thumbnailUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80",
+    views: 48200,
+    likes: 4100,
+    eWasteSavedKg: 2.1,
+    toolsRequired: [
+      "Phillips #1 Screwdriver",
+      "Flat Plastic Spudger",
+      "Multimeter (for CR2032 voltage verification)"
+    ],
+    partsRequired: [
+      { name: "CR2032 3V Lithium Coin Cell", partNumber: "CR2032", priceApprox: "$1.50", partId: "part_cr2032" }
+    ],
+    steps: [
+      {
+        stepNumber: 1,
+        title: "Method 1: CLR_CMOS / PWCLR Motherboard Jumper",
+        description: "Unplug PC AC power cord. Locate the 3-pin jumper labeled CLR_CMOS or PWCLR near the battery. Move the jumper cap from Pins 1-2 to Pins 2-3 for 10 seconds, then return to Pins 1-2."
+      },
+      {
+        stepNumber: 2,
+        title: "Method 2: CR2032 Battery Removal & Capacitor Drainage",
+        description: "Remove the CR2032 coin cell battery. Hold the PC power button down continuously for 45-60 seconds to completely discharge motherboard filter capacitors. Replace battery and boot."
+      },
+      {
+        stepNumber: 3,
+        title: "Method 3: Master Password Generator (Laptops)",
+        description: "Enter an incorrect password 3 times on the laptop screen. Note the System Disabled hash (e.g., [5-8 hex characters] or Service Tag). Enter this hash into bios-pw.org to retrieve the official factory master backdoor unlock password."
+      }
+    ],
+    publishedAt: "2026-09-14"
+  },
+  {
+    id: "guide_lg_tv_uart",
+    title: "LG Smart TV Firmware Read & Write via VGA-to-3.5mm Serial UART Port",
+    deviceCategory: "TVs & Monitors",
+    deviceModel: "LG 32LN540B / 42LN5700 / OLED Series",
+    issueType: "Stuck on LG Logo Bootloop / Bricked eMMC Firmware",
+    difficulty: "Intermediate",
+    estimatedTimeMinutes: 30,
+    author: {
+      name: "Dave Kinkade",
+      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+      badge: "Display Panel Specialist",
+      reputation: 4120
+    },
+    thumbnailUrl: "https://images.unsplash.com/photo-1593784991095-a205069470b6?w=800&auto=format&fit=crop&q=80",
+    views: 14700,
+    likes: 1120,
+    eWasteSavedKg: 8.5,
+    toolsRequired: [
+      "VGA DB15 Male Connector",
+      "3.5mm Stereo TRS Mini-Jack Cable",
+      "USB-to-TTL UART Converter (3.3V FTDI / CP2102)",
+      "PuTTY or TeraTerm Serial Terminal"
+    ],
+    partsRequired: [],
+    steps: [
+      {
+        stepNumber: 1,
+        title: "VGA to 3.5mm Cable Pinout Solder",
+        description: "Solder VGA Pin 4 to 3.5mm Tip (UART TX), VGA Pin 11 to 3.5mm Ring 1 (UART RX), and VGA Pins 5 & 15 to 3.5mm Sleeve (GND)."
+      },
+      {
+        stepNumber: 2,
+        title: "Terminal Speed & Serial Protocol Setup",
+        description: "Configure PuTTY COM port with Speed: 115200, Data bits: 8, Stop bits: 1, Parity: None, Flow control: None."
+      },
+      {
+        stepNumber: 3,
+        title: "U-Boot Recovery Shell Interruption",
+        description: "Plug 3.5mm jack into TV service port and power on. Tap ESC or Space repeatedly to halt the boot sequence into U-Boot recovery shell to flash kernel partition images."
+      }
+    ],
+    publishedAt: "2026-09-13"
+  },
+  {
+    id: "guide_10pin_jtag",
+    title: "10-Pin Universal JTAG / ISP / ICSP Programming Header Reference",
+    deviceCategory: "System & Power",
+    deviceModel: "AVR, PIC, Atmel XMEGA, ARM Cortex Systems",
+    issueType: "Bricked MCU / Corrupt Fuse Bits / In-Circuit Firmware Flashing",
+    difficulty: "Intermediate",
+    estimatedTimeMinutes: 25,
+    author: {
+      name: "Alex V.",
+      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+      badge: "Avionics Specialist",
+      reputation: 3950
+    },
+    thumbnailUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80",
+    views: 16200,
+    likes: 1350,
+    eWasteSavedKg: 0.1,
+    toolsRequired: [
+      "10-Pin 2x5 2.54mm IDC Ribbon Cable",
+      "USBasp / Atmel-ICE / PICkit Programmer",
+      "avrdude or MPLAB IPE Programming Utility"
+    ],
+    partsRequired: [],
+    steps: [
+      {
+        stepNumber: 1,
+        title: "Standard Pinout Identification",
+        description: "Pin 1 = SDO/MISO, Pin 2 = VCC (5V), Pin 3 = RESET, Pin 4 = Clock Out, Pin 5 = SCK, Pin 6 = XMEGA PDI, Pin 7 = SDI/MOSI, Pin 8 & 10 = GND, Pin 9 = MCLR (13V)."
+      },
+      {
+        stepNumber: 2,
+        title: "Pin 9 High Voltage Warning",
+        description: "Ensure target board does not bridge Pin 9 (MCLR) to low-voltage 3.3V lines, as PIC programmers pulse 13V during flash erase."
+      },
+      {
+        stepNumber: 3,
+        title: "Verifying Device Signature",
+        description: "Run 'avrdude -c usbasp -p m328p' to read the chip signature (e.g. 0x1E 0x95 0x0F) and restore factory clock fuses."
+      }
+    ],
+    publishedAt: "2026-09-12"
+  },
+  {
+    id: "guide_win_cmd_admin",
+    title: "Reset Windows Admin Password via CMD & Advanced Startup (Utilman Bypass)",
+    deviceCategory: "Laptops & PCs",
+    deviceModel: "Windows 11 / 10 / Server",
+    issueType: "Forgotten Windows Local Administrator Account Password",
+    difficulty: "Beginner",
+    estimatedTimeMinutes: 15,
+    author: {
+      name: "Marcus Chen",
+      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+      badge: "Circuit Board Engineer",
+      reputation: 4890
+    },
+    thumbnailUrl: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80",
+    views: 52000,
+    likes: 4600,
+    eWasteSavedKg: 1.5,
+    toolsRequired: [
+      "Standard PC Keyboard (Shift key held during restart)"
+    ],
+    partsRequired: [],
+    steps: [
+      {
+        stepNumber: 1,
+        title: "Boot into WinRE Command Prompt",
+        description: "Hold Shift while clicking Restart on the login screen. Choose Troubleshoot -> Advanced options -> Command Prompt."
+      },
+      {
+        stepNumber: 2,
+        title: "Swap utilman.exe with cmd.exe",
+        description: "Identify Windows drive (e.g., D:). Run 'copy D:\\Windows\\System32\\utilman.exe D:\\Windows\\System32\\utilman.exe.bak' and then 'copy D:\\Windows\\System32\\cmd.exe D:\\Windows\\System32\\utilman.exe'."
+      },
+      {
+        stepNumber: 3,
+        title: "Open Accessibility CMD & Reset Password",
+        description: "Reboot to login screen. Click the Accessibility icon in the bottom right corner. In the elevated prompt, type 'net user Administrator NewPassword123!' and press Enter to log in."
+      }
+    ],
+    publishedAt: "2026-09-11"
+  },
+  {
+    id: "guide_laptop_battery_opt",
+    title: "Laptop Battery Lifespan Optimization & Fuel Gauge Calibration",
+    deviceCategory: "Laptops & PCs",
+    deviceModel: "Dell, Lenovo, HP, ASUS Laptops",
+    issueType: "Rapid Battery Drain / Capacity Drops Unexpectedly from 40% to 5%",
+    difficulty: "Beginner",
+    estimatedTimeMinutes: 15,
+    author: {
+      name: "Sarah Jenkins",
+      avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80",
+      badge: "Certified Audio Tech",
+      reputation: 2110
+    },
+    thumbnailUrl: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80",
+    views: 28400,
+    likes: 2400,
+    eWasteSavedKg: 0.8,
+    toolsRequired: [
+      "Windows 11 Settings & Task Manager"
+    ],
+    partsRequired: [],
+    steps: [
+      {
+        stepNumber: 1,
+        title: "Set Power Mode to Balanced",
+        description: "Press Win + I -> System -> Power & battery. Set Power mode to Balanced to enable dynamic CPU C-state clock throttling."
+      },
+      {
+        stepNumber: 2,
+        title: "Display Brightness Calibration",
+        description: "Reduce display brightness to 50%. The LED backlight represents up to 40% of instantaneous power draw."
+      },
+      {
+        stepNumber: 3,
+        title: "Audit Background Power Draw",
+        description: "Open Task Manager (Ctrl+Shift+Esc), inspect the 'Power usage' column, and kill runaway background tasks."
+      },
+      {
+        stepNumber: 4,
+        title: "Full BMS Gas Gauge Recalibration Cycle",
+        description: "Charge to 100%, leave plugged in for 2 hours, run down to 5%, leave unpowered for 3 hours, then charge back to 100% uninterrupted to recalibrate the fuel gauge IC."
+      }
+    ],
+    publishedAt: "2026-09-10"
   }
 ];
 
@@ -326,6 +769,99 @@ export const initialParts: SparePart[] = [
 ];
 
 export const initialCourses: Course[] = [
+  {
+    id: "course_professional_electrical",
+    title: "Professional Electrical Engineering & Systems",
+    category: "Professional",
+    level: "Intermediate",
+    durationHours: 20.0,
+    lessonsCount: 6,
+    description: "A comprehensive professional curriculum covering essential electrical principles, digital electronics, workshop practices, construction, and sustainable energy systems.",
+    instructor: "SANWOLF Technical Institute",
+    progressPercent: 0,
+    isCompleted: false,
+    skillsAcquired: ["Electrical Theory", "Digital Control", "Workshop Safety", "System Construction", "Renewable Energy"],
+    modules: [
+      {
+        id: "m_prof_1",
+        title: "Electrical Principles and Practice",
+        duration: "120 min",
+        summary: "Advanced circuit theory, power distribution, and fundamental electrical calculations.",
+        hasHandsOnCircuit: true,
+        quizQuestion: {
+          question: "Which law governs the relationship between voltage, current, and resistance in a circuit?",
+          options: ["Kirchhoff's Law", "Ohm's Law", "Faraday's Law", "Newton's Law"],
+          correctIndex: 1,
+          explanation: "Ohm's Law defines the fundamental relationship between voltage, current, and resistance."
+        }
+      },
+      {
+        id: "m_prof_2",
+        title: "Electronic Control and Digital Electronics",
+        duration: "120 min",
+        summary: "Logic gates, microcontrollers, and digital signal processing for modern control systems.",
+        hasHandsOnCircuit: true,
+        quizQuestion: {
+          question: "Which component is commonly used as a basic building block for digital logic?",
+          options: ["Resistor", "Capacitor", "Transistor", "Inductor"],
+          correctIndex: 2,
+          explanation: "Transistors are the fundamental components used to create digital logic gates."
+        }
+      },
+      {
+        id: "m_prof_3",
+        title: "Workshop Practice",
+        duration: "180 min",
+        summary: "Safe tool usage, precision soldering, component identification, and diagnostic procedures.",
+        hasHandsOnCircuit: true,
+        quizQuestion: {
+          question: "What is the primary purpose of a 'Smoke Stopper' in workshop practice?",
+          options: ["To prevent fire", "To limit current and protect circuits from shorts", "To improve signal quality", "To test voltage"],
+          correctIndex: 1,
+          explanation: "A Smoke Stopper limits current flow to prevent damage if a short circuit exists on the board."
+        }
+      },
+      {
+        id: "m_prof_4",
+        title: "Electrical Workmanship",
+        duration: "120 min",
+        summary: "Best practices for professional-grade wiring, cable management, and terminal connections.",
+        hasHandsOnCircuit: false,
+        quizQuestion: {
+          question: "Why is proper cable termination important in electrical work?",
+          options: ["Aesthetics only", "To ensure mechanical strength and electrical continuity", "It is not important", "To reduce signal speed"],
+          correctIndex: 1,
+          explanation: "Proper termination ensures reliable contact, prevents overheating, and provides mechanical integrity."
+        }
+      },
+      {
+        id: "m_prof_5",
+        title: "Electrical Systems and Construction",
+        duration: "150 min",
+        summary: "Designing and implementing power distribution systems, conduits, and installation standards.",
+        hasHandsOnCircuit: false,
+        quizQuestion: {
+          question: "What is the purpose of a circuit breaker in a system?",
+          options: ["To increase voltage", "To protect against overcurrent and short circuits", "To switch AC to DC", "To regulate frequency"],
+          correctIndex: 1,
+          explanation: "Circuit breakers automatically interrupt electrical flow to prevent damage from overcurrent."
+        }
+      },
+      {
+        id: "m_prof_6",
+        title: "Renewable Energy Technology",
+        duration: "120 min",
+        summary: "Principles of solar PV systems, battery storage, and inverter integration.",
+        hasHandsOnCircuit: false,
+        quizQuestion: {
+          question: "What device converts DC power from solar panels to AC power for home use?",
+          options: ["Inverter", "Rectifier", "Transformer", "Capacitor"],
+          correctIndex: 0,
+          explanation: "An inverter converts Direct Current (DC) into Alternating Current (AC)."
+        }
+      }
+    ]
+  },
   {
     id: "course_tv_learning",
     title: "Universal Device Database: Learning from TVs",

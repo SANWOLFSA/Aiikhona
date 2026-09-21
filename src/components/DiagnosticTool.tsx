@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Activity, Sparkles, ShieldAlert, Wrench, Copy, ArrowRight, CircleCheck } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Activity, Sparkles, ShieldAlert, Wrench, Copy, ArrowRight, Volume2 } from 'lucide-react';
+import { useBenchSpeech, playBenchBeep, speakBenchText } from '../hooks/useBenchSpeech';
+import HandsFreeBenchHUD from './HandsFreeBenchHUD';
 
 const PRESETS: Record<string, string[]> = {
   "Gaming Consoles": [
@@ -57,12 +59,12 @@ const CATEGORIES = [
 
 const BRANDS = ["Apple", "Sony", "Nintendo", "Samsung", "Dell", "Microsoft", "Lenovo", "Asus", "DJI", "LG"];
 
-export default function DiagnosticTool({ onSourcePart, onOpenGuide }: { onSourcePart: (p: string) => void; onOpenGuide: (id: string) => void }) {
+export default function DiagnosticTool({ onSourcePart, onOpenGuide: _onOpenGuide }: { onSourcePart: (p: string) => void; onOpenGuide: (id: string) => void }) {
   const [category, setCategory] = useState("Gaming Consoles");
   const [model, setModel] = useState("Nintendo Switch (HAC-001)");
   const [symptom, setSymptom] = useState("Draws 0.00A at 15V / No battery charge");
   const [powerStatus, setPowerStatus] = useState("No power drawn (0.00A on meter)");
-  const [visualSigns, setVisualSigns] = useState("No visible scorch marks, battery at 3.2V");
+  const [visualSigns, _setVisualSigns] = useState("No visible scorch marks, battery at 3.2V");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [copied, setCopied] = useState(false);
@@ -75,10 +77,11 @@ export default function DiagnosticTool({ onSourcePart, onOpenGuide }: { onSource
     }
   }, [category]);
 
-  const handleDiagnose = async () => {
+  const handleDiagnose = useCallback(async () => {
     if (!symptom) return;
     setLoading(true);
     setResult(null);
+    playBenchBeep('step');
 
     // Simulate high-fidelity diagnostic reasoning
     setTimeout(() => {
@@ -143,10 +146,11 @@ export default function DiagnosticTool({ onSourcePart, onOpenGuide }: { onSource
         repairabilityScore
       });
       setLoading(false);
+      playBenchBeep('pass');
     }, 1200);
-  };
+  }, [category, model, symptom]);
 
-  const handleCopyReport = () => {
+  const handleCopyReport = useCallback(() => {
     if (!result) return;
     const reportText = `DIYELECTRONICS DIAGNOSTIC REPORT
 Device Model: ${model}
@@ -160,10 +164,181 @@ Estimated Component Cost: ${result.estimatedCost}`;
     navigator.clipboard.writeText(reportText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
+  }, [model, result, symptom]);
+
+  // Voice Commands Configuration for Diagnostic Tool
+  const voiceCommands = useMemo(() => [
+    {
+      keywords: ['run diagnosis', 'diagnose', 'start diagnosis', 'diagnose symptom', 'analyze fault', 'test board'],
+      description: 'Run Diagnostic Tree',
+      action: () => {
+        handleDiagnose();
+      }
+    },
+    {
+      keywords: ['category gaming', 'gaming consoles', 'consoles'],
+      description: 'Select Gaming Consoles',
+      action: () => {
+        setCategory("Gaming Consoles");
+        speakBenchText("Category set to Gaming Consoles.");
+      }
+    },
+    {
+      keywords: ['category laptops', 'laptops and pcs', 'laptops', 'computers'],
+      description: 'Select Laptops & PCs',
+      action: () => {
+        setCategory("Laptops & PCs");
+        speakBenchText("Category set to Laptops and PCs.");
+      }
+    },
+    {
+      keywords: ['category smartphones', 'smartphones', 'phones', 'mobile'],
+      description: 'Select Smartphones',
+      action: () => {
+        setCategory("Smartphones");
+        speakBenchText("Category set to Smartphones.");
+      }
+    },
+    {
+      keywords: ['category tvs', 'monitors', 'tvs and monitors', 'displays'],
+      description: 'Select TVs & Monitors',
+      action: () => {
+        setCategory("TVs & Monitors");
+        speakBenchText("Category set to TVs and Monitors.");
+      }
+    },
+    {
+      keywords: ['category audio', 'headphones', 'sound'],
+      description: 'Select Audio & Headphones',
+      action: () => {
+        setCategory("Audio & Headphones");
+        speakBenchText("Category set to Audio and Headphones.");
+      }
+    },
+    {
+      keywords: ['category iot', 'microcontrollers', 'esp32', 'arduino'],
+      description: 'Select Microcontrollers & IoT',
+      action: () => {
+        setCategory("Microcontrollers & IoT");
+        speakBenchText("Category set to Microcontrollers and IoT.");
+      }
+    },
+    {
+      keywords: ['read diagnosis', 'read results', 'speak diagnosis', 'what is the issue', 'diagnosis summary'],
+      description: 'Read Full Diagnostic Results',
+      action: () => {
+        if (result) {
+          const text = `Diagnostic result for ${model}: Probable cause is ${result.probableCause}. Severity is ${result.severity}. Safety mandate: ${result.safetyWarning}. First test point: ${result.testPoints?.[0] || 'See screen'}. Estimated cost: ${result.estimatedCost}`;
+          speakBenchText(text);
+        } else {
+          speakBenchText("No diagnostic report generated yet. Say 'run diagnosis' to start.");
+        }
+      }
+    },
+    {
+      keywords: ['read test points', 'multimeter test points', 'probe checkpoints', 'test points'],
+      description: 'Read Multimeter Test Points',
+      action: () => {
+        if (result && result.testPoints) {
+          const points = result.testPoints.join('. ');
+          speakBenchText(`Multimeter Checkpoints: ${points}`);
+        } else {
+          speakBenchText("No test points available. Run diagnosis first.");
+        }
+      }
+    },
+    {
+      keywords: ['read steps', 'repair steps', 'resolution steps', 'fix steps'],
+      description: 'Read Repair Resolution Steps',
+      action: () => {
+        if (result && result.steps) {
+          const stepsText = result.steps.map((s: any, idx: number) => `Step ${idx + 1}: ${s.title}. ${s.detail}`).join('. ');
+          speakBenchText(`Recommended steps: ${stepsText}`);
+        } else {
+          speakBenchText("No resolution steps available yet.");
+        }
+      }
+    },
+    {
+      keywords: ['safety warning', 'warning', 'safety mandate'],
+      description: 'Read Safety Warning',
+      action: () => {
+        if (result && result.safetyWarning) {
+          speakBenchText(`Safety Warning: ${result.safetyWarning}`);
+        } else {
+          speakBenchText("Always isolate lithium batteries and disconnect power before probing.");
+        }
+      }
+    },
+    {
+      keywords: ['copy report', 'copy diagnostic', 'copy text'],
+      description: 'Copy Report to Clipboard',
+      action: () => {
+        handleCopyReport();
+        speakBenchText("Diagnostic report copied to clipboard.");
+      }
+    },
+    {
+      keywords: ['source parts', 'buy part', 'find part'],
+      description: 'Source Replacement Component',
+      action: () => {
+        onSourcePart(model.includes("Switch") ? "M92T36" : "IC Chip");
+        speakBenchText("Navigating to parts sourcing marketplace.");
+      }
+    }
+  ], [handleDiagnose, handleCopyReport, model, onSourcePart, result]);
+
+  const {
+    isListening,
+    isSupported,
+    lastTranscript,
+    matchedCommand,
+    isSpeaking,
+    isTtsEnabled,
+    setIsTtsEnabled,
+    micPermissionDenied,
+    toggleListening,
+    speakText,
+    stopSpeaking,
+    simulateVoiceCommand
+  } = useBenchSpeech({ commands: voiceCommands });
+
+  // Auto-announce diagnostic result when complete if voice enabled
+  useEffect(() => {
+    if (result && isListening && isTtsEnabled) {
+      speakText(`Diagnosis complete. Probable cause: ${result.probableCause}. Confidence: ${result.confidenceScore} percent.`);
+    }
+  }, [result, isListening, isTtsEnabled, speakText]);
+
+  const cheatSheetCommands = [
+    { phrase: 'run diagnosis', action: 'Trigger AI schematic diagnostic tree' },
+    { phrase: 'category [gaming / laptops / phones]', action: 'Select target device archetype' },
+    { phrase: 'read diagnosis', action: 'Speak diagnosed probable cause and severity' },
+    { phrase: 'read test points', action: 'Speak multimeter probe checks out loud' },
+    { phrase: 'read steps', action: 'Speak step-by-step resolution walk' },
+    { phrase: 'copy report', action: 'Copy diagnostic report to clipboard' },
+    { phrase: 'source parts', action: 'Jump to verified replacement IC sourcing' }
+  ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      {/* Hands-Free Voice Control HUD */}
+      <HandsFreeBenchHUD
+        isListening={isListening}
+        isSupported={isSupported}
+        isSpeaking={isSpeaking}
+        isTtsEnabled={isTtsEnabled}
+        lastTranscript={lastTranscript}
+        matchedCommand={matchedCommand}
+        micPermissionDenied={micPermissionDenied}
+        availableCommands={cheatSheetCommands}
+        onToggleListening={toggleListening}
+        onToggleTts={() => setIsTtsEnabled(!isTtsEnabled)}
+        onStopSpeaking={stopSpeaking}
+        onSimulateCommand={simulateVoiceCommand}
+        benchContextTitle="Hardware Diagnostic Bench • Hands-Free Voice Control"
+      />
+
       <div className="bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 text-white rounded-3xl p-6 sm:p-8 border border-stone-800 shadow-xl relative overflow-hidden">
         <div className="absolute right-0 top-0 translate-x-10 -translate-y-10 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
         <div className="max-w-3xl space-y-3 relative z-10">
@@ -295,14 +470,28 @@ Estimated Component Cost: ${result.estimatedCost}`;
                   <h3 className="text-xl font-black text-stone-900 dark:text-stone-100 mt-2">{result.probableCause}</h3>
                 </div>
                 
-                <button 
-                  onClick={handleCopyReport}
-                  className="p-2 rounded-lg bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 text-stone-600 dark:text-stone-300 transition-colors text-xs flex items-center gap-1.5"
-                  title="Copy Report"
-                >
-                  <Copy className="w-4 h-4" />
-                  <span>{copied ? "Copied!" : "Copy Report"}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const text = `Diagnostic result for ${model}: Probable cause is ${result.probableCause}. Severity is ${result.severity}. Safety warning: ${result.safetyWarning}. Test point 1: ${result.testPoints?.[0] || 'none'}.`;
+                      speakText(text);
+                    }}
+                    className="p-2 rounded-lg bg-amber-100 dark:bg-amber-950/60 hover:bg-amber-200 dark:hover:bg-amber-900 text-amber-800 dark:text-amber-300 transition-colors text-xs flex items-center gap-1.5 font-bold"
+                    title="Read Results Aloud"
+                  >
+                    <Volume2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                    <span>Read Aloud</span>
+                  </button>
+                  <button 
+                    onClick={handleCopyReport}
+                    className="p-2 rounded-lg bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 text-stone-600 dark:text-stone-300 transition-colors text-xs flex items-center gap-1.5"
+                    title="Copy Report"
+                  >
+                    <Copy className="w-4 h-4" />
+                    <span>{copied ? "Copied!" : "Copy Report"}</span>
+                  </button>
+                </div>
               </div>
 
               {result.safetyWarning && (

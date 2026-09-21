@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Leaf, Search, BookmarkCheck, Bookmark, Clock, Eye, ThumbsUp, Wrench, BookOpen } from 'lucide-react';
 import ProTipsSidebar from './ProTipsSidebar';
 import DeviceDirectoryView from './DeviceDirectoryView';
+import { useBenchSpeech, speakBenchText } from '../hooks/useBenchSpeech';
+import HandsFreeBenchHUD from './HandsFreeBenchHUD';
 import type { Guide } from '../types';
 
 export default function RepairGuides({ 
@@ -10,7 +12,7 @@ export default function RepairGuides({
   onToggleSaveGuide, 
   onSelectGuide, 
   isOfflineOnly, 
-  onToggleOfflineOnly, 
+  onToggleOfflineOnly: _onToggleOfflineOnly, 
   initialSearchQuery, 
   onNavigateToDiagnostic,
   onSourcePart
@@ -44,10 +46,140 @@ export default function RepairGuides({
     return true;
   });
 
+  // Bench Hands-Free Voice Commands for Guide Navigation
+  const voiceCommands = useMemo(() => [
+    {
+      keywords: ['device directory', 'directory', 'show directory', 'devices'],
+      description: 'Switch to A-Z Device Directory',
+      action: () => {
+        setViewMode('directory');
+        speakBenchText("Switched to A-Z Device Directory.");
+      }
+    },
+    {
+      keywords: ['curated library', 'library', 'guides library', 'show guides'],
+      description: 'Switch to Curated Guides Library',
+      action: () => {
+        setViewMode('library');
+        speakBenchText("Switched to Curated Guides Library.");
+      }
+    },
+    {
+      keywords: ['diagnose', 'diagnostic tool', 'diagnose symptom', 'troubleshoot'],
+      description: 'Open Diagnostic Tool',
+      action: () => {
+        onNavigateToDiagnostic();
+        speakBenchText("Opening Hardware Diagnostic Tool.");
+      }
+    },
+    {
+      keywords: ['category gaming', 'gaming consoles', 'gaming category', 'consoles'],
+      description: 'Filter by Gaming Consoles',
+      action: () => {
+        setCategory("Gaming Consoles");
+        speakBenchText("Filtering for Gaming Consoles.");
+      }
+    },
+    {
+      keywords: ['category laptops', 'laptops and pcs', 'laptops', 'computers'],
+      description: 'Filter by Laptops & PCs',
+      action: () => {
+        setCategory("Laptops & PCs");
+        speakBenchText("Filtering for Laptops and PCs.");
+      }
+    },
+    {
+      keywords: ['category smartphones', 'smartphones', 'phones', 'mobile'],
+      description: 'Filter by Smartphones',
+      action: () => {
+        setCategory("Smartphones");
+        speakBenchText("Filtering for Smartphones.");
+      }
+    },
+    {
+      keywords: ['category tvs', 'monitors', 'tvs and monitors', 'displays'],
+      description: 'Filter by TVs & Monitors',
+      action: () => {
+        setCategory("TVs & Monitors");
+        speakBenchText("Filtering for TVs and Monitors.");
+      }
+    },
+    {
+      keywords: ['category audio', 'audio and headphones', 'headphones', 'sound'],
+      description: 'Filter by Audio & Headphones',
+      action: () => {
+        setCategory("Audio & Headphones");
+        speakBenchText("Filtering for Audio and Headphones.");
+      }
+    },
+    {
+      keywords: ['all categories', 'show all', 'reset category', 'clear filter'],
+      description: 'Show All Categories',
+      action: () => {
+        setCategory("All");
+        setSearch('');
+        speakBenchText("Displaying all repair categories.");
+      }
+    },
+    {
+      keywords: ['open first guide', 'first guide', 'open guide', 'select first'],
+      description: 'Open First Filtered Guide',
+      action: () => {
+        if (filteredGuides.length > 0) {
+          speakBenchText(`Opening guide: ${filteredGuides[0].title}`);
+          onSelectGuide(filteredGuides[0]);
+        } else {
+          speakBenchText("No guides matched the current filter.");
+        }
+      }
+    }
+  ], [filteredGuides, onNavigateToDiagnostic, onSelectGuide]);
+
+  const {
+    isListening,
+    isSupported,
+    lastTranscript,
+    matchedCommand,
+    isSpeaking,
+    isTtsEnabled,
+    setIsTtsEnabled,
+    micPermissionDenied,
+    toggleListening,
+    stopSpeaking,
+    simulateVoiceCommand
+  } = useBenchSpeech({ commands: voiceCommands });
+
+  const cheatSheetCommands = [
+    { phrase: 'directory / library', action: 'Toggle between Directory and Library' },
+    { phrase: 'diagnose symptom', action: 'Jump directly to Diagnostic Tool' },
+    { phrase: 'gaming / laptops / phones', action: 'Filter guides by hardware class' },
+    { phrase: 'all categories', action: 'Reset filters to show all devices' },
+    { phrase: 'open first guide', action: 'Launch top matching repair guide' }
+  ];
+
   return (
     <div className="space-y-6">
-      {/* View Mode Toggle Header */}
+      {/* Top Hands-Free HUD */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        <HandsFreeBenchHUD
+          isListening={isListening}
+          isSupported={isSupported}
+          isSpeaking={isSpeaking}
+          isTtsEnabled={isTtsEnabled}
+          lastTranscript={lastTranscript}
+          matchedCommand={matchedCommand}
+          micPermissionDenied={micPermissionDenied}
+          availableCommands={cheatSheetCommands}
+          onToggleListening={toggleListening}
+          onToggleTts={() => setIsTtsEnabled(!isTtsEnabled)}
+          onStopSpeaking={stopSpeaking}
+          onSimulateCommand={simulateVoiceCommand}
+          benchContextTitle="Repair Guides Directory • Hands-Free Voice Navigation"
+        />
+      </div>
+
+      {/* View Mode Toggle Header */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-stone-900 text-white rounded-2xl p-2 flex items-center justify-between gap-4 shadow-md">
           <div className="flex items-center gap-2 pl-2">
             <Wrench className="w-4 h-4 text-amber-400" />

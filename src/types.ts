@@ -102,3 +102,41 @@ export interface VerificationRequest {
   submittedDate: string;
   reviewerNotes: string;
 }
+
+export type AnnotationCategory = 'fault_warning' | 'test_point' | 'repair_tip' | 'replacement' | 'question';
+
+export interface AnnotationReply {
+  id: string;
+  authorName: string;
+  authorRole: string;
+  authorAvatar?: string;
+  content: string;
+  createdAt: string;
+  isVerifiedTech?: boolean;
+}
+
+export interface SocialAnnotation {
+  id: string;
+  boardId: string; // e.g. 'iphone-14-pro-max'
+  boardSide: 'top' | 'bottom';
+  x: number; // 0 to 100 percentage
+  y: number; // 0 to 100 percentage
+  componentRef?: string; // e.g. 'U_PMIC', 'C402', 'L3301'
+  title: string;
+  content: string;
+  category: AnnotationCategory;
+  voltageRail?: string;
+  diodeReading?: string;
+  authorId: string;
+  authorName: string;
+  authorRole: string;
+  authorAvatar?: string;
+  upvotes: number;
+  verifiedFixCount: number;
+  hasUserUpvoted?: boolean;
+  hasUserVerified?: boolean;
+  createdAt: string;
+  replies: AnnotationReply[];
+  tags: string[];
+}
+

@@ -5,10 +5,12 @@ const Nt = {
   OFFLINE_GUIDES: "diyelectronics_offline_guides",
   SAVED_GUIDE_IDS: "diyelectronics_saved_guide_ids",
   THEME_MODE: "diyelectronics_dark_mode",
+  APP_THEME: "diyelectronics_app_theme",
   VERIFICATION_REQUESTS: "diyelectronics_verification_requests",
   CACHED_FORUM_POSTS: "diyelectronics_forum_posts",
   REPAIR_HISTORY: "diyelectronics_repair_history",
-  IS_AUTHENTICATED: "diyelectronics_is_authenticated"
+  IS_AUTHENTICATED: "diyelectronics_is_authenticated",
+  SOCIAL_ANNOTATIONS: "diyelectronics_social_annotations"
 };
 
 const wl: UserProfile = {
@@ -149,6 +151,25 @@ export const storage = {
       console.warn(y);
     }
   },
+  getAppTheme(): string {
+    try {
+      const u = localStorage.getItem(Nt.APP_THEME);
+      if (u) {
+        const parsed = JSON.parse(u);
+        return parsed === 'smart-formal' ? 'amber-workshop' : parsed;
+      }
+      return 'amber-workshop';
+    } catch {
+      return 'amber-workshop';
+    }
+  },
+  setAppTheme(theme: string) {
+    try {
+      localStorage.setItem(Nt.APP_THEME, JSON.stringify(theme));
+    } catch (y) {
+      console.warn(y);
+    }
+  },
   getIsAuthenticated() {
     try {
       const u = localStorage.getItem(Nt.IS_AUTHENTICATED);
@@ -169,6 +190,21 @@ export const storage = {
       localStorage.setItem(Nt.IS_AUTHENTICATED, JSON.stringify(false));
     } catch (u) {
       console.warn(u);
+    }
+  },
+  getSocialAnnotations() {
+    try {
+      const u = localStorage.getItem(Nt.SOCIAL_ANNOTATIONS);
+      return u ? JSON.parse(u) : [];
+    } catch {
+      return [];
+    }
+  },
+  saveSocialAnnotations(annotations: any[]) {
+    try {
+      localStorage.setItem(Nt.SOCIAL_ANNOTATIONS, JSON.stringify(annotations));
+    } catch (u) {
+      console.warn("LocalStorage annotations save failed", u);
     }
   }
 };

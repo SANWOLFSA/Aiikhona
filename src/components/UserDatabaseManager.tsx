@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Database, Upload, Calendar, User, Trash2, Plus, ShieldAlert, CheckCircle2, RefreshCw, Tv, Cpu, Wrench, AlertCircle, Check, Sparkles, CheckCircle } from 'lucide-react';
-import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
+import { describeCloudError, currentUid } from '../lib/firestoreErrors';
 import { collection, doc, getDocs, setDoc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
 
 interface MetadataRecord {
@@ -10,7 +11,7 @@ interface MetadataRecord {
   fileType: string;
   uploadDate: string;
   accountEmail: string;
-  metadataSizeKb: number;
+  metadataSizeKb?: number;
   notes: string;
 }
 
@@ -85,12 +86,15 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
   const [errorMsg, setErrorMsg] = useState('');
 
   const fetchRecords = async () => {
-    if (!currentUser?.id && !auth.currentUser?.uid) {
+    const uid = currentUid();
+    if (!uid) {
       setIsLoading(false);
+      setRecords([]);
+      setSavedDevices([]);
       return;
     }
-    const uid = currentUser?.id || auth.currentUser?.uid;
     setIsLoading(true);
+    setErrorMsg('');
     try {
       // Fetch metadata uploads
       const metadataQuery = query(collection(db, 'user_metadata_uploads'), where('userId', '==', uid));
@@ -105,7 +109,7 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
           fileType: data.fileType,
           uploadDate: data.uploadDate || new Date().toISOString(),
           accountEmail: data.accountEmail,
-          metadataSizeKb: data.metadataSizeKb || 128,
+          metadataSizeKb: typeof data.metadataSizeKb === 'number' ? data.metadataSizeKb : undefined,
           notes: data.notes || ''
         });
       });
@@ -134,8 +138,7 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
       setSavedDevices(deviceItems);
       
     } catch (error) {
-      console.error("Error fetching user database records:", error);
-      setErrorMsg("Failed to fetch records. Check console for details.");
+      setErrorMsg(describeCloudError(error, 'load your records'));
     } finally {
       setIsLoading(false);
     }
@@ -156,8 +159,12 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
       return;
     }
 
-    const uid = currentUser?.id || auth.currentUser?.uid || 'guest_user';
-    const email = currentUser?.email || auth.currentUser?.email || 'technician@diy.org';
+    const uid = currentUid();
+    if (!uid) {
+      setErrorMsg('Please sign in with an account to save records.');
+      return;
+    }
+    const email = auth.currentUser?.email || currentUser?.email || '';
     setIsSubmitting(true);
     setErrorMsg('');
 
@@ -169,8 +176,7 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
       fileType,
       uploadDate: new Date().toLocaleString(),
       accountEmail: email,
-      metadataSizeKb: Math.floor(Math.random() * 500) + 45,
-      notes: notes.trim() || 'User uploaded schematic & diagnostic telemetry'
+      notes: notes.trim()
     };
 
     try {
@@ -178,7 +184,7 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
         ...newRecord,
         createdAt: serverTimestamp()
       });
-      setSuccessMsg('Metadata record successfully saved to Firestore database!');
+      setSuccessMsg('Record saved.');
       setFileName('');
       setNotes('');
       setFileNameTouched(false);
@@ -187,8 +193,7 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
       await fetchRecords();
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, `user_metadata_uploads/${recordId}`);
-      setErrorMsg('Failed to save metadata to Firestore. Please check permissions.');
+      setErrorMsg(describeCloudError(error, 'save this record', `user_metadata_uploads/${recordId}`));
     } finally {
       setIsSubmitting(false);
     }
@@ -202,11 +207,10 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
       } else {
         setSavedDevices(prev => prev.filter(d => d.id !== id));
       }
-      setSuccessMsg('Record deleted from database.');
+      setSuccessMsg('Record deleted.');
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `${collectionName}/${id}`);
-      setErrorMsg('Failed to delete record.');
+      setErrorMsg(describeCloudError(error, 'delete this record', `${collectionName}/${id}`));
     }
   };
 
@@ -456,7 +460,7 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
                   >
                     <option value="PDF Schematic">PDF Schematic (Circuit Maps)</option>
                     <option value="Boardview / CAD">Boardview / CAD (.brd / .cad)</option>
-                    <option value="Diagnostic Telemetry">Diagnostic Telemetry (.bin / .hex firmware)</option>
+                    <option value="Diagnostic Telemetry">Firmware / diagnostic dump (.bin / .hex)</option>
                     <option value="Account Backup">Account Backup (JSON / config)</option>
                   </select>
                 </div>

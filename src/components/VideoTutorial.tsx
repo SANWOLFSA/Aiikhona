@@ -13,6 +13,7 @@ export default function VideoTutorial({
         onClick={onClose}
         className="absolute top-4 right-4 z-20 p-1.5 rounded-full bg-black/60 text-white hover:bg-black/90 transition-all border border-white/10"
         title="Close Player"
+        aria-label="Close video"
       >
         <X className="w-4 h-4" />
       </button>
@@ -20,7 +21,7 @@ export default function VideoTutorial({
       <video 
         src={videoUrl} 
         controls 
-        autoPlay 
+        preload="metadata"
         className="w-full h-full max-h-full object-contain"
       />
     </div>

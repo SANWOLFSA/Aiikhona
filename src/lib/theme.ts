@@ -22,7 +22,32 @@ export interface ThemeConfig {
   bannerTag: string;
 }
 
+export const DEFAULT_THEME_ID = 'circuit-mint';
+
 export const APP_THEMES: Record<string, ThemeConfig> = {
+  'circuit-mint': {
+    id: 'circuit-mint',
+    name: 'Circuit Mint',
+    shortLabel: 'Mint',
+    badge: 'SMART BENCH',
+    description: 'Modern, friendly indigo-violet with fresh mint highlights on soft slate',
+    primaryBg: 'bg-gradient-to-r from-indigo-600 to-violet-500 dark:from-indigo-500 dark:to-violet-500',
+    primaryHover: 'hover:from-indigo-500 hover:to-violet-400 dark:hover:from-indigo-400 dark:hover:to-violet-400',
+    primaryText: 'text-white',
+    activeNavBg: 'bg-gradient-to-r from-indigo-600 to-violet-500 text-white shadow-md shadow-indigo-500/25 dark:shadow-violet-900/40',
+    activeNavText: 'text-white',
+    activeNavIconBg: 'bg-white/20 text-white',
+    activeNavIconText: 'text-white',
+    accentText: 'text-emerald-600 dark:text-emerald-300',
+    accentBorder: 'border-emerald-400/40 dark:border-emerald-400/30',
+    indicatorBg: 'bg-emerald-400',
+    headerBadgeBg: 'bg-emerald-50 dark:bg-emerald-400/10',
+    headerBadgeText: 'text-emerald-700 dark:text-emerald-300',
+    headerBadgeBorder: 'border-emerald-200 dark:border-emerald-400/30',
+    glowShadow: 'shadow-indigo-500/20',
+    cardBannerBg: 'bg-gradient-to-br from-indigo-950 via-slate-900 to-emerald-950/70 border-indigo-900/40',
+    bannerTag: 'Smart, friendly repair workspace'
+  },
   'obsidian-sapphire': {
     id: 'obsidian-sapphire',
     name: 'Obsidian Sapphire',
@@ -141,6 +166,7 @@ export const APP_THEMES: Record<string, ThemeConfig> = {
 };
 
 export const THEME_ORDER = [
+  'circuit-mint',
   'obsidian-sapphire',
   'emerald-circuit',
   'cyber-neon',

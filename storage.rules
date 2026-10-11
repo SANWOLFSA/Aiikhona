@@ -1,0 +1,102 @@
+rules_version = '2';
+
+// =====================================================================
+// DIY Electronics — Cloud Storage Security Rules
+//
+// IMPORTANT: Storage rules can only look up documents in the (default)
+// Firestore database, and this app uses a NAMED database. So the admin
+// check here cannot read the `admins/{uid}` collection. An admin is:
+//   - a user with the Auth custom claim  admin == true, or
+//   - a uid listed in adminUids() below (edit, then deploy these rules).
+// Keep this list in sync with the Firestore `admins/{uid}` docs.
+// =====================================================================
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Replace the placeholder with your Firebase Auth uid(s).
+    function adminUids() {
+      return ['ikkjmInKTNMJ1sUz1XI1ahJes2L2'];
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (request.auth.token.admin == true || request.auth.uid in adminUids());
+    }
+
+    // --- Seller verification documents (PRIVATE) -----------------------
+    // sellerDocs/{uid}/{docType}/{timestamp_filename}
+    // PDF / JPG / PNG, max 10 MB. Files are write-once: the seller can add
+    // new files but never overwrite or delete what an admin may have
+    // reviewed. Only the owner and admins can read them.
+    match /sellerDocs/{uid}/{docType}/{fileName} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid)
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType.matches('application/pdf|image/jpeg|image/png');
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // --- Marketplace listing photos (PUBLIC read) ----------------------
+    // listingImages/{uid}/{fileName}: images only, max 5 MB.
+    match /listingImages/{uid}/{fileName} {
+      allow read: if true;
+      allow create, update: if isOwner(uid)
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // --- Personal file storage (FileStorageManager) --------------------
+    match /users/{uid}/files/{allPaths=**} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && request.resource.size <= 25 * 1024 * 1024;
+    }
+
+    // --- Community repair videos (PUBLIC read) -------------------------
+    // communityVideos/{uid}/{videoId}/{fileName}: MP4 / WebM / MOV, under
+    // 200 MB. Write-once by the owner; owner or admin may delete.
+    match /communityVideos/{uid}/{videoId}/{fileName} {
+      allow read: if true;
+      allow create: if isOwner(uid)
+        && request.resource.size < 200 * 1024 * 1024
+        && request.resource.contentType.matches('video/(mp4|webm|quicktime)');
+      allow update: if false;
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // --- Real PCB board photos (PUBLIC read) ---------------------------
+    // boardPhotos/{uid}/{boardId}/{fileName}: JPG/PNG/WebP, max 10 MB, write-once.
+    match /boardPhotos/{uid}/{boardId}/{fileName} {
+      allow read: if true;
+      allow create: if isOwner(uid)
+        && boardId.matches('^[A-Z0-9][A-Z0-9._-]{1,63}$')
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+      allow update: if false;
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // --- Real PCB schematic / boardview files (PUBLIC read) ------------
+    // boardFiles/{uid}/{boardId}/{fileName}: PDF / ZIP / boardview binaries, max 25 MB, write-once.
+    match /boardFiles/{uid}/{boardId}/{fileName} {
+      allow read: if true;
+      allow create: if isOwner(uid)
+        && boardId.matches('^[A-Z0-9][A-Z0-9._-]{1,63}$')
+        && request.resource.size <= 25 * 1024 * 1024
+        && request.resource.contentType.matches('application/(pdf|octet-stream|zip|x-zip-compressed)');
+      allow update: if false;
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // Everything else is denied by default.
+  }
+}

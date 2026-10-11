@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Folder, Upload, FileText, Download, Trash2, Eye, ShieldAlert, CheckCircle2, RefreshCw, File, AlertCircle, Check } from 'lucide-react';
-import { db, auth, storage, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, storage } from '../lib/firebase';
+import { describeCloudError, currentUid } from '../lib/firestoreErrors';
 import { collection, doc, getDocs, setDoc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
@@ -70,9 +71,10 @@ export default function FileStorageManager({ currentUser }: { currentUser: any }
   };
 
   const fetchFiles = async () => {
-    const uid = currentUser?.id || auth.currentUser?.uid;
+    const uid = currentUid();
     if (!uid) {
       setIsLoading(false);
+      setFiles([]);
       return;
     }
     setIsLoading(true);
@@ -95,7 +97,7 @@ export default function FileStorageManager({ currentUser }: { currentUser: any }
       });
       setFiles(records);
     } catch (error) {
-      console.error("Error fetching user files:", error);
+      setErrorMsg(describeCloudError(error, 'load your files'));
     } finally {
       setIsLoading(false);
     }
@@ -109,13 +111,18 @@ export default function FileStorageManager({ currentUser }: { currentUser: any }
     e.preventDefault();
     if (!selectedFile) return;
 
-    const uid = currentUser?.id || auth.currentUser?.uid || 'guest';
+    const uid = currentUid();
+    if (!uid) {
+      setErrorMsg('Please sign in with an account to upload files.');
+      return;
+    }
     setIsUploading(true);
     setErrorMsg('');
     setSuccessMsg('');
 
     const fileId = `file_${Date.now()}`;
-    const storagePath = `users/${uid}/files/${fileId}_${selectedFile.name}`;
+    const safeName = selectedFile.name.replace(/[^\w.\-]+/g, '_').slice(0, 120);
+    const storagePath = `users/${uid}/files/${fileId}_${safeName}`;
     const fileRef = ref(storage, storagePath);
 
     try {
@@ -140,13 +147,12 @@ export default function FileStorageManager({ currentUser }: { currentUser: any }
         createdAt: serverTimestamp()
       });
 
-      setSuccessMsg(`Successfully uploaded "${selectedFile.name}" to Cloud Storage!`);
+      setSuccessMsg(`Uploaded "${selectedFile.name}".`);
       setSelectedFile(null);
       await fetchFiles();
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, `user_files/${fileId}`);
-      setErrorMsg('Failed to upload file. Please check storage rules and connection.');
+      setErrorMsg(describeCloudError(error, 'upload this file', storagePath));
     } finally {
       setIsUploading(false);
     }
@@ -158,7 +164,10 @@ export default function FileStorageManager({ currentUser }: { currentUser: any }
     try {
       // Delete from Firebase Storage
       const fileRef = ref(storage, file.storagePath);
-      await deleteObject(fileRef).catch(err => console.warn("Storage deletion warning:", err));
+      await deleteObject(fileRef).catch(err => {
+        // A missing object is fine (already gone); anything else should stop us deleting the record.
+        if ((err as { code?: string })?.code !== 'storage/object-not-found') throw err;
+      });
 
       // Delete from Firestore
       await deleteDoc(doc(db, 'user_files', file.id));
@@ -167,8 +176,7 @@ export default function FileStorageManager({ currentUser }: { currentUser: any }
       setSuccessMsg(`Deleted "${file.fileName}" successfully.`);
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `user_files/${file.id}`);
-      setErrorMsg('Failed to delete file.');
+      setErrorMsg(describeCloudError(error, 'delete this file', `user_files/${file.id}`));
     }
   };
 

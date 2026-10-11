@@ -1,5 +1,16 @@
 import { Guide, SparePart, Course, ForumPost, VerificationRequest } from './types';
 
+/**
+ * Seed guides are written and maintained by the DIY Electronics team. We don't attribute them
+ * to individual people, and we don't show view/like counts or videos we don't have.
+ */
+const GUIDE_AUTHOR = {
+  name: "DIY Electronics",
+  avatar: "",
+  badge: "Editorial team",
+  reputation: 0,
+};
+
 export const initialGuides: Guide[] = [
   {
     id: "guide_hard_reset",
@@ -9,16 +20,8 @@ export const initialGuides: Guide[] = [
     issueType: "Frozen Screen / Bootloop / Forgotten Passcode",
     difficulty: "Beginner",
     estimatedTimeMinutes: 5,
-    author: {
-      name: "SANWOLF System",
-      avatar: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=150&auto=format&fit=crop&q=80",
-      badge: "AI Hardware Assistant",
-      reputation: 9999
-    },
+    author: GUIDE_AUTHOR,
     thumbnailUrl: "https://images.unsplash.com/photo-1598327105666-5b89351cb31b?w=800&auto=format&fit=crop&q=80",
-    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    views: 45000,
-    likes: 3200,
     eWasteSavedKg: 0.15,
     toolsRequired: [
       "No specialized tools required (Hardware buttons only)"
@@ -68,16 +71,8 @@ export const initialGuides: Guide[] = [
     issueType: "No Power / Won't Charge / Draws 0.00A at 15V",
     difficulty: "Advanced",
     estimatedTimeMinutes: 45,
-    author: {
-      name: "Elena Rostova",
-      avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80",
-      badge: "Master Micro-Soldering Tech",
-      reputation: 3420
-    },
+    author: GUIDE_AUTHOR,
     thumbnailUrl: "https://images.unsplash.com/photo-1612287233267-336c58ffeb8e?w=800&auto=format&fit=crop&q=80",
-    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    views: 18450,
-    likes: 1240,
     eWasteSavedKg: 0.39,
     toolsRequired: [
       "Digital Multimeter with Fine Probe Needles",
@@ -145,16 +140,8 @@ export const initialGuides: Guide[] = [
     issueType: "Stuck at 5V 0.03A / Not Negotiating 20V USB-PD",
     difficulty: "Expert",
     estimatedTimeMinutes: 75,
-    author: {
-      name: "Marcus Chen",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
-      badge: "Circuit Board Engineer",
-      reputation: 4890
-    },
+    author: GUIDE_AUTHOR,
     thumbnailUrl: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80",
-    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-    views: 29800,
-    likes: 2150,
     eWasteSavedKg: 1.4,
     toolsRequired: [
       "Digital USB-C Power Delivery Analyzer Meter",
@@ -211,16 +198,8 @@ export const initialGuides: Guide[] = [
     issueType: "Battery Dies in 15 Minutes / Uneven Left Ear ANC Hiss",
     difficulty: "Beginner",
     estimatedTimeMinutes: 25,
-    author: {
-      name: "Sarah Jenkins",
-      avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80",
-      badge: "Certified Audio Tech",
-      reputation: 2110
-    },
+    author: GUIDE_AUTHOR,
     thumbnailUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80",
-    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    views: 14230,
-    likes: 1040,
     eWasteSavedKg: 0.25,
     toolsRequired: [
       "Phillips #00 Screwdriver",
@@ -259,16 +238,8 @@ export const initialGuides: Guide[] = [
     issueType: "Half Screen Dark / Flashlight Test Shows Image / Sound OK",
     difficulty: "Intermediate",
     estimatedTimeMinutes: 60,
-    author: {
-      name: "Dave Kinkade",
-      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
-      badge: "Display Panel Specialist",
-      reputation: 4120
-    },
+    author: GUIDE_AUTHOR,
     thumbnailUrl: "https://images.unsplash.com/photo-1593784991095-a205069470b6?w=800&auto=format&fit=crop&q=80",
-    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    views: 42100,
-    likes: 3100,
     eWasteSavedKg: 18.5,
     toolsRequired: [
       "Dual Suction Cups for LCD Panel Lifting",
@@ -313,15 +284,8 @@ export const initialGuides: Guide[] = [
     issueType: "Motor Twitch / Desync / No Gyro Telemetry / ELRS Receiver Unbound",
     difficulty: "Intermediate",
     estimatedTimeMinutes: 35,
-    author: {
-      name: "Alex V.",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-      badge: "Avionics Specialist",
-      reputation: 3950
-    },
+    author: GUIDE_AUTHOR,
     thumbnailUrl: "https://images.unsplash.com/photo-1527977966376-1c8408f9f108?w=800&auto=format&fit=crop&q=80",
-    views: 22100,
-    likes: 1890,
     eWasteSavedKg: 0.65,
     toolsRequired: [
       "Smoke Stopper Current-Limiting Fuse (XT60)",
@@ -371,15 +335,8 @@ export const initialGuides: Guide[] = [
     issueType: "Red Standby LED Blinks 2 Times in Loop / Shuts Down in 2 Seconds",
     difficulty: "Advanced",
     estimatedTimeMinutes: 40,
-    author: {
-      name: "Dave Kinkade",
-      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
-      badge: "Display Panel Specialist",
-      reputation: 4120
-    },
+    author: GUIDE_AUTHOR,
     thumbnailUrl: "https://images.unsplash.com/photo-1593784991095-a205069470b6?w=800&auto=format&fit=crop&q=80",
-    views: 31400,
-    likes: 2780,
     eWasteSavedKg: 12.0,
     toolsRequired: [
       "Stereo Inspection Microscope",
@@ -424,15 +381,8 @@ export const initialGuides: Guide[] = [
     issueType: "Card Not Recognized / Corrupt Partition / 0 Bytes Capacity",
     difficulty: "Expert",
     estimatedTimeMinutes: 60,
-    author: {
-      name: "Marcus Chen",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
-      badge: "Circuit Board Engineer",
-      reputation: 4890
-    },
+    author: GUIDE_AUTHOR,
     thumbnailUrl: "https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=800&auto=format&fit=crop&q=80",
-    views: 19800,
-    likes: 1650,
     eWasteSavedKg: 0.05,
     toolsRequired: [
       "38 AWG Enamelled Copper Magnet Wire",
@@ -478,15 +428,8 @@ export const initialGuides: Guide[] = [
     issueType: "Locked by BIOS / UEFI Supervisor Password at Power-On",
     difficulty: "Beginner",
     estimatedTimeMinutes: 20,
-    author: {
-      name: "Marcus Chen",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
-      badge: "Circuit Board Engineer",
-      reputation: 4890
-    },
+    author: GUIDE_AUTHOR,
     thumbnailUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80",
-    views: 48200,
-    likes: 4100,
     eWasteSavedKg: 2.1,
     toolsRequired: [
       "Phillips #1 Screwdriver",
@@ -523,15 +466,8 @@ export const initialGuides: Guide[] = [
     issueType: "Stuck on LG Logo Bootloop / Bricked eMMC Firmware",
     difficulty: "Intermediate",
     estimatedTimeMinutes: 30,
-    author: {
-      name: "Dave Kinkade",
-      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
-      badge: "Display Panel Specialist",
-      reputation: 4120
-    },
+    author: GUIDE_AUTHOR,
     thumbnailUrl: "https://images.unsplash.com/photo-1593784991095-a205069470b6?w=800&auto=format&fit=crop&q=80",
-    views: 14700,
-    likes: 1120,
     eWasteSavedKg: 8.5,
     toolsRequired: [
       "VGA DB15 Male Connector",
@@ -567,15 +503,8 @@ export const initialGuides: Guide[] = [
     issueType: "Bricked MCU / Corrupt Fuse Bits / In-Circuit Firmware Flashing",
     difficulty: "Intermediate",
     estimatedTimeMinutes: 25,
-    author: {
-      name: "Alex V.",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-      badge: "Avionics Specialist",
-      reputation: 3950
-    },
+    author: GUIDE_AUTHOR,
     thumbnailUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80",
-    views: 16200,
-    likes: 1350,
     eWasteSavedKg: 0.1,
     toolsRequired: [
       "10-Pin 2x5 2.54mm IDC Ribbon Cable",
@@ -610,15 +539,8 @@ export const initialGuides: Guide[] = [
     issueType: "Forgotten Windows Local Administrator Account Password",
     difficulty: "Beginner",
     estimatedTimeMinutes: 15,
-    author: {
-      name: "Marcus Chen",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
-      badge: "Circuit Board Engineer",
-      reputation: 4890
-    },
+    author: GUIDE_AUTHOR,
     thumbnailUrl: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80",
-    views: 52000,
-    likes: 4600,
     eWasteSavedKg: 1.5,
     toolsRequired: [
       "Standard PC Keyboard (Shift key held during restart)"
@@ -651,15 +573,8 @@ export const initialGuides: Guide[] = [
     issueType: "Rapid Battery Drain / Capacity Drops Unexpectedly from 40% to 5%",
     difficulty: "Beginner",
     estimatedTimeMinutes: 15,
-    author: {
-      name: "Sarah Jenkins",
-      avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80",
-      badge: "Certified Audio Tech",
-      reputation: 2110
-    },
+    author: GUIDE_AUTHOR,
     thumbnailUrl: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80",
-    views: 28400,
-    likes: 2400,
     eWasteSavedKg: 0.8,
     toolsRequired: [
       "Windows 11 Settings & Task Manager"

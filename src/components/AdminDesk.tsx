@@ -1,186 +1,653 @@
-import { useState } from 'react';
-import { ShieldCheck, CheckCircle2, AlertTriangle, FileText, Ban, Trash2, User, Search } from 'lucide-react';
-import type { VerificationRequest } from '../types';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  AlertTriangle,
+  Ban,
+  BadgeCheck,
+  CheckCircle2,
+  ClipboardList,
+  ExternalLink,
+  Eye,
+  FileText,
+  History,
+  Loader2,
+  Package,
+  ShieldCheck,
+  ShieldOff,
+  Trash2,
+  XCircle,
+} from 'lucide-react';
+import type { ThemeConfig } from '../lib/theme';
+import { useAdminStatus } from '../lib/admin';
+import HubModeration from './hub/HubModeration';
+import { isFirebaseConfigured } from '../lib/firebase';
+import {
+  STATUS_LABELS,
+  VERIFICATION_DOC_TYPES,
+  adminDeleteListing,
+  adminLogDocumentOpened,
+  adminModerateListing,
+  adminSetVerificationStatus,
+  formatTs,
+  formatZar,
+  friendlyError,
+  getSellerDocUrl,
+  subscribeAllListings,
+  subscribeAuditLog,
+  subscribeVerificationQueue,
+  type Actor,
+  type AuditEntry,
+  type ChecklistEntry,
+  type ListingDoc,
+  type ListingStatus,
+  type SellerVerification,
+  type VerificationStatus,
+} from '../lib/marketplace';
 import UserManagement from './UserManagement';
 import SearchAnalytics from './SearchAnalytics';
+import VideoModeration from './catalog/VideoModeration';
 
-export default function AdminDesk({ 
-  verifications, 
-  onApproveVerification, 
-  onRejectVerification 
-}: { 
-  verifications: VerificationRequest[]; 
-  onApproveVerification: (id: string) => void; 
-  onRejectVerification: (id: string, reason: string) => void; 
-}) {
-  const [activeTab, setActiveTab] = useState<'compliance' | 'users' | 'search'>('compliance');
-  const [rejectId, setRejectId] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
+type AdminTab = 'verifications' | 'listings' | 'videos' | 'hub' | 'audit' | 'users' | 'search';
 
-  const handleRejectSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!rejectId || !rejectReason) return;
-    onRejectVerification(rejectId, rejectReason);
-    setRejectId(null);
-    setRejectReason("");
+const cardCls = 'bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm shadow-slate-200/50 dark:shadow-none';
+const inputCls =
+  'w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400';
+const ghostBtn =
+  'px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold transition-colors disabled:opacity-50 inline-flex items-center gap-1.5';
+
+const STATUS_STYLE: Record<VerificationStatus, string> = {
+  draft: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+  submitted: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300',
+  under_review: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300',
+  approved: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
+  rejected: 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300',
+  revoked: 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300',
+};
+
+const QUEUE_FILTERS: { id: string; label: string; match: (s: VerificationStatus) => boolean }[] = [
+  { id: 'open', label: 'To review', match: s => s === 'submitted' || s === 'under_review' },
+  { id: 'approved', label: 'Approved', match: s => s === 'approved' },
+  { id: 'closed', label: 'Rejected / revoked', match: s => s === 'rejected' || s === 'revoked' },
+  { id: 'draft', label: 'Drafts', match: s => s === 'draft' },
+  { id: 'all', label: 'All', match: () => true },
+];
+
+const EMPTY_CHECK: ChecklistEntry = { legible: false, valid: false, matchesCompany: false };
+
+function ErrorNote({ msg }: { msg: string | null }) {
+  if (!msg) return null;
+  return (
+    <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
+      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+      <span>{msg}</span>
+    </div>
+  );
+}
+
+function Empty({ icon: Icon, title, body }: { icon: any; title: string; body: string }) {
+  return (
+    <div className={`${cardCls} py-12 px-6 text-center space-y-2`}>
+      <Icon className="w-9 h-9 mx-auto text-emerald-500" />
+      <p className="text-sm font-black text-slate-900 dark:text-slate-100">{title}</p>
+      <p className="text-xs text-slate-500 max-w-md mx-auto">{body}</p>
+    </div>
+  );
+}
+
+export default function AdminDesk({ themeConfig }: { themeConfig?: ThemeConfig } = {}) {
+  const admin = useAdminStatus();
+  const [tab, setTab] = useState<AdminTab>('verifications');
+  const actor: Actor | null = admin.uid ? { uid: admin.uid, email: admin.email } : null;
+
+  const tabs: { id: AdminTab; label: string }[] = [
+    { id: 'verifications', label: 'Verifications' },
+    { id: 'listings', label: 'Listings' },
+    { id: 'videos', label: 'Videos' },
+    { id: 'hub', label: 'Repair hub' },
+    { id: 'audit', label: 'Audit log' },
+    { id: 'users', label: 'Users' },
+    { id: 'search', label: 'Search' },
+  ];
+
+  const titles: Record<AdminTab, [string, string]> = {
+    verifications: ['Seller verification queue', 'Open each company document, tick the checklist, then approve, reject with a reason, or revoke a badge. Every action is written to the audit log.'],
+    listings: ['Listing moderation', 'Listings from individuals and unverified companies wait here until approved. Remove anything that breaks the rules.'],
+    videos: ['Community video moderation', 'Reported videos appear first. Remove (hide) a video, restore it, or delete it permanently. Every action is written to the audit log.'],
+    hub: ['Repair hub moderation', 'Approve or remove community device pages, AI-researched component pages, guides and Answers, and work through device requests. Every action is written to the audit log.'],
+    audit: ['Admin audit log', 'Who did what, and when. Entries cannot be edited or deleted.'],
+    users: ['User database management', 'Manage registered platform users, monitor reputation, and view repair statistics.'],
+    search: ['Search analytics', 'Common search queries and frequently searched devices that return zero results.'],
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      <div className="bg-white dark:bg-stone-900 rounded-3xl p-6 sm:p-8 border border-stone-200 dark:border-stone-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+      <div className={`${cardCls} p-6 sm:p-8 flex flex-col lg:flex-row lg:items-end justify-between gap-6`}>
         <div className="space-y-2 max-w-2xl">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 text-xs font-bold">
-            <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
-            <span>Admin Control Panel</span>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-400/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-400/30 text-xs font-bold">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Admin Desk{admin.email ? ` · ${admin.email}` : ''}</span>
           </div>
-          <h1 className="text-2xl sm:text-4xl font-black text-stone-900 dark:text-stone-100 tracking-tight font-sans">
-            {activeTab === 'compliance' ? 'Business Compliance & Verification Portal' : activeTab === 'users' ? 'User Database Management' : 'Search Analytics Dashboard'}
-          </h1>
-          <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-400">
-            {activeTab === 'compliance' 
-              ? 'Review company trading licenses, VAT registrations, and headquarters papers. Approve genuine distributors to grant them gold verification status across the platform.'
-              : activeTab === 'users'
-                ? 'Manage registered platform users, monitor reputation, and view repair statistics.'
-                : 'Visualize common search queries and identify frequently searched devices that return zero results.'
-            }
-          </p>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-50 tracking-tight">{titles[tab][0]}</h1>
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">{titles[tab][1]}</p>
         </div>
-        <div className="flex bg-stone-100 dark:bg-stone-900 rounded-xl p-1">
-          <button
-            onClick={() => setActiveTab('compliance')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors ${activeTab === 'compliance' ? 'bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 shadow-sm' : 'text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'}`}
-          >
-            Compliance
-          </button>
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors ${activeTab === 'users' ? 'bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 shadow-sm' : 'text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'}`}
-          >
-            Users
-          </button>
-          <button
-            onClick={() => setActiveTab('search')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors ${activeTab === 'search' ? 'bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 shadow-sm' : 'text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'}`}
-          >
-            Search
-          </button>
+        <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800/80 rounded-2xl p-1 gap-0.5">
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                tab === t.id
+                  ? themeConfig?.activeNavBg || 'bg-gradient-to-r from-indigo-600 to-violet-500 text-white shadow-md shadow-indigo-500/25'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {activeTab === 'compliance' ? (
-        <div className="space-y-6">
-          <h3 className="text-xs font-black text-stone-400 uppercase tracking-wider">PENDING VERIFICATION DOCUMENTS ({verifications.filter(v => v.status === "Pending Review").length})</h3>
-          
-          {verifications.length === 0 ? (
-            <div className="py-12 bg-white dark:bg-stone-900 rounded-3xl border border-stone-200 dark:border-stone-800 text-center text-stone-400 space-y-2">
-              <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-500" />
-              <p className="text-sm font-bold text-stone-850 dark:text-stone-100">All submissions fully cleared!</p>
-              <p className="text-xs">No corporate audits pending review at this time.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-6">
-              {verifications.map(req => (
-                <div key={req.id} className="bg-white dark:bg-stone-900 rounded-3xl border border-stone-200 dark:border-stone-800 overflow-hidden shadow-xs">
-                  <div className="bg-stone-50 dark:bg-stone-850 p-4 sm:px-6 flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 dark:border-stone-800">
-                    <div className="space-y-0.5">
-                      <h4 className="text-base font-black text-stone-900 dark:text-stone-100">{req.companyName}</h4>
-                      <span className="text-[10px] text-stone-400 font-mono">Submitted On: {req.submittedDate} • ID: {req.id}</span>
-                    </div>
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${req.status === "Pending Review" ? "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300" : req.status.includes("Approved") ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-850 dark:text-emerald-300" : "bg-red-100 dark:bg-red-950 text-red-800 dark:text-red-300"}`}>{req.status}</span>
-                  </div>
-
-                  <div className="p-5 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-3 text-xs">
-                      <div>
-                        <span className="text-stone-400 block">Registration Code / Country</span>
-                        <span className="font-mono font-bold text-stone-800 dark:text-stone-200">{req.registrationNumber} • {req.countryOfRegistration}</span>
-                      </div>
-                      <div>
-                        <span className="text-stone-400 block">TAX/VAT ID Number</span>
-                        <span className="font-mono font-bold text-stone-800 dark:text-stone-200">{req.vatTaxNumber || "Not Supplied"}</span>
-                      </div>
-                      <div>
-                        <span className="text-stone-400 block">Compliance Contact Information</span>
-                        <span className="font-bold text-stone-800 dark:text-stone-200">{req.contactEmail} • {req.contactPhone}</span>
-                      </div>
-                      <div>
-                        <span className="text-stone-400 block">Official Registered HQ Address</span>
-                        <span className="font-bold text-stone-800 dark:text-stone-200">{req.officialAddress}</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="p-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950/30 flex items-start gap-3">
-                        <FileText className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                        <div>
-                          <h5 className="text-xs font-bold text-stone-700 dark:text-stone-300 uppercase">Trading License Papers</h5>
-                          <p className="text-[11px] text-stone-500 mt-0.5">Government registration reference hash: UK-COMP-09482103 verified.</p>
-                        </div>
-                      </div>
-
-                      {req.reviewerNotes && (
-                        <div className="p-3.5 rounded-xl border border-stone-200 dark:border-stone-800 text-xs">
-                          <span className="font-bold text-stone-700 dark:text-stone-300 block mb-1">Reviewer Remarks:</span>
-                          <p className="text-stone-500 leading-relaxed font-mono">{req.reviewerNotes}</p>
-                        </div>
-                      )}
-
-                      {req.status === "Pending Review" && (
-                        <div className="flex items-center gap-2 pt-2">
-                          <button 
-                            onClick={() => onApproveVerification(req.id)}
-                            className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs transition-colors flex items-center gap-1.5"
-                          >
-                            <ShieldCheck className="w-4 h-4" />
-                            <span>Approve & Verify</span>
-                          </button>
-                          <button 
-                            onClick={() => setRejectId(req.id)}
-                            className="px-4 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:border-red-500 text-xs font-bold transition-all flex items-center gap-1.5"
-                          >
-                            <Ban className="w-4 h-4" />
-                            <span>Reject Submission</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+      {admin.bootstrapOnly && (
+        <div className="p-5 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-900/50 text-xs text-amber-900 dark:text-amber-200 space-y-2">
+          <p className="font-black flex items-center gap-2 text-sm"><AlertTriangle className="w-4 h-4 text-amber-500" /> Finish admin setup: your actions will be rejected until you do</p>
+          <p>You can see this desk because your email is listed in <code className="font-mono">VITE_ADMIN_EMAILS</code>, but the security rules don't recognise you as an admin yet. Do one of these in the Firebase console:</p>
+          <ol className="list-decimal pl-5 space-y-1">
+            <li>Firestore: create a document <code className="font-mono">admins/{admin.uid}</code> (any fields, e.g. <code className="font-mono">email: "{admin.email}"</code>), <b>or</b> set <code className="font-mono">role: "admin"</code> on <code className="font-mono">users/{admin.uid}</code>.</li>
+            <li>Storage (to open seller documents): add your uid <code className="font-mono select-all">{admin.uid}</code> to <code className="font-mono">adminUids()</code> in <code className="font-mono">storage.rules</code>, or give your account the custom claim <code className="font-mono">admin: true</code>.</li>
+            <li>Deploy the rules: <code className="font-mono">firebase deploy --only firestore:rules,storage</code>, then reload this page.</li>
+          </ol>
         </div>
-      ) : activeTab === 'users' ? (
+      )}
+
+      {!isFirebaseConfigured && (tab === 'verifications' || tab === 'listings' || tab === 'videos' || tab === 'hub' || tab === 'audit') ? (
+        <Empty icon={AlertTriangle} title="Cloud database not configured" body="Add the VITE_FIREBASE_* settings to this build to review verifications, moderate listings and read the audit log." />
+      ) : tab === 'verifications' ? (
+        <VerificationQueue actor={actor} />
+      ) : tab === 'listings' ? (
+        <ListingModeration actor={actor} />
+      ) : tab === 'videos' ? (
+        <VideoModeration actor={actor} />
+      ) : tab === 'hub' ? (
+        <HubModeration actor={actor} />
+      ) : tab === 'audit' ? (
+        <AuditLogView />
+      ) : tab === 'users' ? (
         <UserManagement />
       ) : (
         <SearchAnalytics />
       )}
+    </div>
+  );
+}
 
-      {rejectId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
-          <form onSubmit={handleRejectSubmit} className="relative w-full max-w-md rounded-3xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 p-6 space-y-4 shadow-2xl">
-            <h3 className="text-lg font-black text-stone-900 dark:text-stone-100 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-red-500" />
-              <span>Reject Company Verification</span>
-            </h3>
-            
-            <div>
-              <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 uppercase mb-1">State Reason for Document Rejection</label>
-              <textarea 
+// ---------------------------------------------------------------------------
+// Verification queue
+// ---------------------------------------------------------------------------
+
+function VerificationQueue({ actor }: { actor: Actor | null }) {
+  const [apps, setApps] = useState<SellerVerification[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [filter, setFilter] = useState('open');
+  const [openUid, setOpenUid] = useState<string | null>(null);
+
+  useEffect(
+    () =>
+      subscribeVerificationQueue(
+        a => {
+          setApps(a);
+          setErr(null);
+        },
+        e => {
+          setApps([]);
+          setErr(friendlyError(e));
+        }
+      ),
+    []
+  );
+
+  const f = QUEUE_FILTERS.find(q => q.id === filter) || QUEUE_FILTERS[0];
+  const visible = (apps || []).filter(a => f.match(a.status));
+  const counts = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const q of QUEUE_FILTERS) m[q.id] = (apps || []).filter(a => q.match(a.status)).length;
+    return m;
+  }, [apps]);
+
+  if (apps === null) return <div className="py-12 text-center text-slate-400 text-sm"><Loader2 className="w-4 h-4 animate-spin inline" /> Loading queue…</div>;
+
+  return (
+    <div className="space-y-4">
+      <ErrorNote msg={err} />
+      <div className="flex flex-wrap gap-1.5">
+        {QUEUE_FILTERS.map(q => (
+          <button
+            key={q.id}
+            onClick={() => setFilter(q.id)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              filter === q.id ? 'bg-gradient-to-r from-indigo-600 to-violet-500 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+            }`}
+          >
+            {q.label} <span className="opacity-70">({counts[q.id] || 0})</span>
+          </button>
+        ))}
+      </div>
+      {visible.length === 0 ? (
+        <Empty icon={CheckCircle2} title={filter === 'open' ? 'Queue is clear' : 'Nothing here'} body={filter === 'open' ? 'No company applications are waiting for review.' : 'No applications match this filter.'} />
+      ) : (
+        <div className="space-y-4">
+          {visible.map(app => (
+            <VerificationCard key={app.uid} app={app} actor={actor} expanded={openUid === app.uid} onToggle={() => setOpenUid(openUid === app.uid ? null : app.uid)} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VerificationCard({ app, actor, expanded, onToggle }: { app: SellerVerification; actor: Actor | null; expanded: boolean; onToggle: () => void }) {
+  const [checklist, setChecklist] = useState<Record<string, ChecklistEntry>>(() => app.checklist || {});
+  const [reason, setReason] = useState('');
+  const [mode, setMode] = useState<null | 'reject' | 'revoke'>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [opening, setOpening] = useState<string | null>(null);
+
+  useEffect(() => {
+    setChecklist(app.checklist || {});
+  }, [app.reviewedAt?.toMillis?.()]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const docs = VERIFICATION_DOC_TYPES.filter(d => app.documents?.[d.key]);
+  const requiredDocs = VERIFICATION_DOC_TYPES.filter(d => d.required);
+  const requiredChecked = requiredDocs.every(d => {
+    const c = checklist[d.key];
+    return app.documents?.[d.key] && c?.legible && c?.valid && c?.matchesCompany;
+  });
+
+  const toggle = (key: string, field: keyof ChecklistEntry) =>
+    setChecklist(c => ({ ...c, [key]: { ...EMPTY_CHECK, ...c[key], [field]: !(c[key]?.[field] ?? false) } }));
+
+  const openDoc = async (key: string) => {
+    const d = app.documents?.[key];
+    if (!d) return;
+    setOpening(key);
+    setErr(null);
+    try {
+      const url = await getSellerDocUrl(d.path);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      if (actor) adminLogDocumentOpened(app, key, actor);
+    } catch (ex) {
+      setErr(`Couldn't open the document: ${friendlyError(ex)} If you're a new admin, add your uid to storage.rules.`);
+    } finally {
+      setOpening(null);
+    }
+  };
+
+  const act = async (status: 'under_review' | 'approved' | 'rejected' | 'revoked') => {
+    if (!actor) {
+      setErr('Sign in again to act on this application.');
+      return;
+    }
+    if ((status === 'rejected' || status === 'revoked') && !reason.trim()) {
+      setErr('Give the seller a reason.');
+      return;
+    }
+    if (status === 'approved' && !window.confirm(`Approve ${app.companyName || 'this company'} and grant the Verified badge?`)) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await adminSetVerificationStatus(app, status, actor, { reason, checklist });
+      setMode(null);
+      setReason('');
+    } catch (ex) {
+      setErr(friendlyError(ex));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reviewable = app.status === 'submitted' || app.status === 'under_review';
+
+  return (
+    <div className={`${cardCls} overflow-hidden`}>
+      <button onClick={onToggle} className="w-full text-left bg-slate-50/80 dark:bg-slate-800/40 px-5 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800">
+        <div className="min-w-0">
+          <h4 className="text-base font-black text-slate-900 dark:text-slate-100 truncate">{app.companyName || 'Unnamed company'}</h4>
+          <p className="text-[11px] text-slate-500 font-mono">
+            {app.registrationNumber || 'no reg. no.'} · submitted {formatTs(app.submittedAt)} · #{app.submissionCount || 0}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-slate-500">{docs.length}/{VERIFICATION_DOC_TYPES.length} docs</span>
+          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${STATUS_STYLE[app.status]}`}>{STATUS_LABELS[app.status]}</span>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="p-5 sm:p-6 space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            {[
+              ['CIPC registration', app.registrationNumber],
+              ['VAT number', app.vatNumber || 'Not supplied'],
+              ['Country', app.country],
+              ['Address', app.address],
+              ['Contact', [app.contactName, app.contactEmail, app.contactPhone].filter(Boolean).join(' · ')],
+              ['Seller uid', app.uid],
+            ].map(([k, v]) => (
+              <div key={k}>
+                <span className="text-slate-400 block">{k}</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200 break-words">{v || '—'}</span>
+              </div>
+            ))}
+          </div>
+
+          {(app.rejectionReason && (app.status === 'rejected' || app.status === 'revoked')) && (
+            <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/30 text-xs text-red-800 dark:text-red-300">
+              Last reason: {app.rejectionReason} {app.reviewerEmail ? `(by ${app.reviewerEmail}, ${formatTs(app.reviewedAt)})` : ''}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <h5 className="text-[11px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5"><ClipboardList className="w-3.5 h-3.5" /> Document checklist</h5>
+            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500">
+                  <tr>
+                    <th className="text-left p-2.5 font-bold">Document</th>
+                    <th className="p-2.5 font-bold">Open</th>
+                    <th className="p-2.5 font-bold">Legible</th>
+                    <th className="p-2.5 font-bold">Valid / current</th>
+                    <th className="p-2.5 font-bold">Matches company</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {VERIFICATION_DOC_TYPES.map(d => {
+                    const stored = app.documents?.[d.key];
+                    const c = checklist[d.key] || EMPTY_CHECK;
+                    return (
+                      <tr key={d.key} className="border-t border-slate-100 dark:border-slate-800">
+                        <td className="p-2.5">
+                          <span className="font-bold text-slate-800 dark:text-slate-200">{d.label}</span>
+                          {d.required && <span className="text-red-500"> *</span>}
+                          <span className="block text-[10px] text-slate-400 truncate max-w-[220px]">{stored ? `${stored.name} · ${(stored.size / 1024).toFixed(0)} KB` : 'Not uploaded'}</span>
+                        </td>
+                        <td className="p-2.5 text-center">
+                          {stored ? (
+                            <button onClick={() => openDoc(d.key)} disabled={opening === d.key} className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-300 font-bold">
+                              {opening === d.key ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Eye className="w-3.5 h-3.5" />} View <ExternalLink className="w-3 h-3" />
+                            </button>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                        {(['legible', 'valid', 'matchesCompany'] as (keyof ChecklistEntry)[]).map(field => (
+                          <td key={field} className="p-2.5 text-center">
+                            <input
+                              type="checkbox"
+                              disabled={!stored || !reviewable}
+                              checked={!!c[field]}
+                              onChange={() => toggle(d.key, field)}
+                              className="w-4 h-4 rounded accent-emerald-500"
+                              aria-label={`${d.label}: ${field}`}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {reviewable && !requiredChecked && <p className="text-[11px] text-slate-500">Tick all three checks on every required document to enable Approve.</p>}
+          </div>
+
+          {mode && (
+            <div className="space-y-2">
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                {mode === 'reject' ? 'Reason for rejection (shown to the seller)' : 'Reason for revoking the badge (shown to the seller)'}
+              </label>
+              <textarea
                 rows={3}
-                required
-                value={rejectReason}
-                onChange={e => setRejectReason(e.target.value)}
-                placeholder="e.g. Registered VAT ID does not match government Companies House database records. License papers expired."
-                className="w-full p-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs"
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                placeholder={mode === 'reject' ? 'e.g. Proof of address is older than 3 months. Please upload a recent municipal bill or bank letter.' : 'e.g. CIPC shows the company as deregistered.'}
+                className={inputCls}
+                maxLength={1000}
               />
             </div>
+          )}
 
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setRejectId(null)} className="px-4 py-2 rounded-xl bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 text-xs font-bold">Cancel</button>
-              <button type="submit" className="px-4 py-2 rounded-xl bg-red-500 text-white font-black text-xs">Confirm Rejection</button>
-            </div>
-          </form>
+          <ErrorNote msg={err} />
+
+          <div className="flex flex-wrap gap-2 pt-1">
+            {app.status === 'submitted' && (
+              <button disabled={busy} onClick={() => act('under_review')} className={ghostBtn}>
+                <FileText className="w-4 h-4" /> Start review
+              </button>
+            )}
+            {reviewable && !mode && (
+              <>
+                <button
+                  disabled={busy || !requiredChecked}
+                  onClick={() => act('approved')}
+                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs transition-colors inline-flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <BadgeCheck className="w-4 h-4" />} Approve & verify
+                </button>
+                <button disabled={busy} onClick={() => setMode('reject')} className={`${ghostBtn} !text-red-600`}>
+                  <Ban className="w-4 h-4" /> Reject
+                </button>
+              </>
+            )}
+            {app.status === 'approved' && !mode && (
+              <button disabled={busy} onClick={() => setMode('revoke')} className={`${ghostBtn} !text-red-600`}>
+                <ShieldOff className="w-4 h-4" /> Revoke badge
+              </button>
+            )}
+            {mode && (
+              <>
+                <button disabled={busy} onClick={() => act(mode === 'reject' ? 'rejected' : 'revoked')} className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white font-black text-xs inline-flex items-center gap-1.5 disabled:opacity-50">
+                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />} Confirm {mode === 'reject' ? 'rejection' : 'revocation'}
+                </button>
+                <button disabled={busy} onClick={() => { setMode(null); setReason(''); }} className={ghostBtn}>Cancel</button>
+              </>
+            )}
+          </div>
+          {app.reviewerEmail && <p className="text-[10px] text-slate-400">Last reviewed by {app.reviewerEmail} · {formatTs(app.reviewedAt)}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Listing moderation
+// ---------------------------------------------------------------------------
+
+function ListingModeration({ actor }: { actor: Actor | null }) {
+  const [listings, setListings] = useState<ListingDoc[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [filter, setFilter] = useState<ListingStatus | 'all'>('pending');
+
+  useEffect(
+    () =>
+      subscribeAllListings(
+        l => {
+          setListings(l);
+          setErr(null);
+        },
+        e => {
+          setListings([]);
+          setErr(friendlyError(e));
+        }
+      ),
+    []
+  );
+
+  if (listings === null) return <div className="py-12 text-center text-slate-400 text-sm"><Loader2 className="w-4 h-4 animate-spin inline" /> Loading listings…</div>;
+  const visible = filter === 'all' ? listings : listings.filter(l => l.status === filter);
+  const count = (s: ListingStatus) => listings.filter(l => l.status === s).length;
+
+  return (
+    <div className="space-y-4">
+      <ErrorNote msg={err} />
+      <div className="flex flex-wrap gap-1.5">
+        {([['pending', `Awaiting review (${count('pending')})`], ['active', `Live (${count('active')})`], ['removed', `Removed (${count('removed')})`], ['all', `All (${listings.length})`]] as [ListingStatus | 'all', string][]).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setFilter(id)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold ${filter === id ? 'bg-gradient-to-r from-indigo-600 to-violet-500 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {visible.length === 0 ? (
+        <Empty icon={Package} title="Nothing here" body={filter === 'pending' ? 'No listings are waiting for approval.' : 'No listings match this filter.'} />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {visible.map(l => <ModerationRow key={l.id} listing={l} actor={actor} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ModerationRow({ listing, actor }: { listing: ListingDoc; actor: Actor | null }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const [reason, setReason] = useState('');
+
+  const run = async (fn: (a: Actor) => Promise<void>) => {
+    if (!actor) return setErr('Sign in again to moderate.');
+    setBusy(true);
+    setErr(null);
+    try {
+      await fn(actor);
+      setRemoving(false);
+      setReason('');
+    } catch (ex) {
+      setErr(friendlyError(ex));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={`${cardCls} !rounded-2xl p-3 flex gap-3`}>
+      {listing.imageUrl ? (
+        <img src={listing.imageUrl} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0" referrerPolicy="no-referrer" />
+      ) : (
+        <div className="w-20 h-20 rounded-xl bg-slate-100 dark:bg-slate-800 shrink-0 flex items-center justify-center text-[10px] text-slate-400">No photo</div>
+      )}
+      <div className="flex-1 min-w-0 space-y-1">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-bold text-slate-900 dark:text-slate-100 line-clamp-1">{listing.title}</p>
+          <span className="text-xs font-mono font-black text-slate-700 dark:text-slate-200 shrink-0">{formatZar(listing.price)}</span>
+        </div>
+        <p className="text-[11px] text-slate-500">
+          {listing.sellerName} ({listing.sellerType}) · {listing.category} · {listing.condition} · {formatTs(listing.createdAt)}
+        </p>
+        <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2">{listing.description || <i>No description</i>}</p>
+        {listing.status === 'removed' && listing.moderationReason && <p className="text-[11px] text-red-600">Removed: {listing.moderationReason}</p>}
+        {removing && (
+          <input value={reason} onChange={e => setReason(e.target.value)} placeholder="Reason (shown to the seller), e.g. counterfeit item, prohibited goods" className={`${inputCls} !text-xs`} maxLength={1000} />
+        )}
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {listing.status !== 'active' && !removing && (
+            <button disabled={busy} onClick={() => run(a => adminModerateListing(listing, 'active', a))} className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black inline-flex items-center gap-1 disabled:opacity-50">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+            </button>
+          )}
+          {listing.status !== 'removed' && !removing && (
+            <button disabled={busy} onClick={() => setRemoving(true)} className={`${ghostBtn} !text-red-600 !py-1.5`}>
+              <Ban className="w-3.5 h-3.5" /> Remove
+            </button>
+          )}
+          {removing && (
+            <>
+              <button disabled={busy || !reason.trim()} onClick={() => run(a => adminModerateListing(listing, 'removed', a, reason))} className="px-3 py-1.5 rounded-xl bg-red-500 text-white text-xs font-black disabled:opacity-50">Confirm remove</button>
+              <button disabled={busy} onClick={() => setRemoving(false)} className={`${ghostBtn} !py-1.5`}>Cancel</button>
+            </>
+          )}
+          {listing.status === 'removed' && (
+            <button
+              disabled={busy}
+              onClick={() => window.confirm(`Permanently delete "${listing.title}"?`) && run(a => adminDeleteListing(listing, a, 'Deleted after removal'))}
+              className={`${ghostBtn} !py-1.5`}
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Delete
+            </button>
+          )}
+        </div>
+        <ErrorNote msg={err} />
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Audit log
+// ---------------------------------------------------------------------------
+
+const ACTION_LABELS: Record<string, string> = {
+  'verification.start_review': 'Started review',
+  'verification.approve': 'Approved company',
+  'verification.reject': 'Rejected application',
+  'verification.revoke': 'Revoked badge',
+  'verification.open_document': 'Opened document',
+  'listing.approve': 'Approved listing',
+  'listing.remove': 'Removed listing',
+  'listing.set_pending': 'Sent listing back to review',
+  'listing.delete': 'Deleted listing',
+};
+
+function AuditLogView() {
+  const [entries, setEntries] = useState<AuditEntry[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(
+    () =>
+      subscribeAuditLog(
+        a => {
+          setEntries(a);
+          setErr(null);
+        },
+        e => {
+          setEntries([]);
+          setErr(friendlyError(e));
+        }
+      ),
+    []
+  );
+  if (entries === null) return <div className="py-12 text-center text-slate-400 text-sm"><Loader2 className="w-4 h-4 animate-spin inline" /> Loading audit log…</div>;
+  return (
+    <div className="space-y-3">
+      <ErrorNote msg={err} />
+      {entries.length === 0 ? (
+        <Empty icon={History} title="No admin actions yet" body="Approvals, rejections, revocations, document views and listing moderation will be recorded here." />
+      ) : (
+        <div className={`${cardCls} overflow-x-auto`}>
+          <table className="w-full text-xs">
+            <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500">
+              <tr>
+                <th className="text-left p-3 font-bold">When</th>
+                <th className="text-left p-3 font-bold">Admin</th>
+                <th className="text-left p-3 font-bold">Action</th>
+                <th className="text-left p-3 font-bold">Target</th>
+                <th className="text-left p-3 font-bold">Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map(e => (
+                <tr key={e.id} className="border-t border-slate-100 dark:border-slate-800 align-top">
+                  <td className="p-3 whitespace-nowrap text-slate-500">{formatTs(e.at)}</td>
+                  <td className="p-3 text-slate-700 dark:text-slate-200">{e.actorEmail || e.actorUid}</td>
+                  <td className="p-3 font-bold text-slate-800 dark:text-slate-100">{ACTION_LABELS[e.action] || e.action}</td>
+                  <td className="p-3 text-slate-600 dark:text-slate-300">{e.targetLabel || e.targetId}<span className="block text-[10px] text-slate-400">{e.targetType}</span></td>
+                  <td className="p-3 text-slate-500 max-w-xs break-words">{e.details || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

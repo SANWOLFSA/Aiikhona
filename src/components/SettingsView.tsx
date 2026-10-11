@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Settings, Moon, Sun, Bell, User, CheckCircle2, Heart, Palette, Sparkles } from 'lucide-react';
-import { APP_THEMES, THEME_ORDER } from '../lib/theme';
+import { APP_THEMES, DEFAULT_THEME_ID, THEME_ORDER } from '../lib/theme';
 
 interface SettingsViewProps {
   darkMode: boolean;
@@ -21,7 +21,7 @@ export default function SettingsView({
   onToggleDarkMode, 
   currentUser, 
   onUpdateUser,
-  themeId = 'obsidian-sapphire',
+  themeId = DEFAULT_THEME_ID,
   onSelectTheme,
   onCycleTheme
 }: SettingsViewProps) {
@@ -47,7 +47,7 @@ export default function SettingsView({
     );
   };
 
-  const activeThemeConfig = APP_THEMES[themeId] || APP_THEMES['obsidian-sapphire'];
+  const activeThemeConfig = APP_THEMES[themeId] || APP_THEMES[DEFAULT_THEME_ID];
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">

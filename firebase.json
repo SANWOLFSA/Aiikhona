@@ -1,0 +1,11 @@
+{
+  "firestore": [
+    {
+      "database": "ai-studio-diyelectronicswe-b1d78eb7-12c8-4870-842e-525f3094f897",
+      "rules": "firestore.rules"
+    }
+  ],
+  "storage": {
+    "rules": "storage.rules"
+  }
+}

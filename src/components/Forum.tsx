@@ -281,7 +281,7 @@ export default function Forum({
           </div>
 
           <div className="lg:col-span-4 bg-white dark:bg-stone-900 rounded-3xl border border-stone-200 dark:border-stone-800 p-5 shadow-xs h-fit space-y-4">
-            <h3 className="text-xs font-black uppercase tracking-wider text-stone-400 pb-2 border-b border-stone-100 dark:border-stone-800">Thread Telemetry</h3>
+            <h3 className="text-xs font-black uppercase tracking-wider text-stone-400 pb-2 border-b border-stone-100 dark:border-stone-800">Thread Details</h3>
             
             <div className="space-y-3 text-xs">
               <div className="flex justify-between">

@@ -1,0 +1,341 @@
+// Issue libraries: TVs / monitors / projectors, audio, media players & decoders, gaming.
+import type { FamilyLibrary } from '../catalog/types';
+
+const MAINS = 'Unplug and wait 5 minutes. The power board primary capacitor holds ~300–380 V DC: discharge it before touching. Work on an insulated mat.';
+const LIION = 'Lithium cells can vent and burn if punctured, shorted or bent. Use plastic tools, never metal pry tools near the battery, and discharge below 30 % before removal.';
+
+export const display: FamilyLibrary = {
+  issues: [
+    {
+      id: 'sound-no-picture', title: 'Sound but no picture (black screen)',
+      symptom: 'The {brand} {model} plays audio, menus may beep, but the screen stays black. Shining a torch at the screen shows a faint image.',
+      causes: ['Failed LED backlight strips (most common)', 'Backlight driver / power board fault', 'Over-voltage protection tripped by one open LED'],
+      tests: ['Torch test: shine a bright torch close to the screen; a faint image = backlight fault, no image = T-CON / mainboard.', 'Measure the backlight output connector on the power board: 30–200 V DC depending on string length. If it rises then drops, an LED is open and OVP tripped.', 'Remove the panel back and test each LED with an LED backlight tester (single LEDs are usually 3 V or 6 V).'],
+      fix: ['Replace the whole set of strips (others are aged and will follow).', 'Use thermal tape / glue for each LED lens; refit diffuser sheets in the correct order.', 'Reduce backlight current slightly (if the driver has a sense-resistor option) to extend life.'],
+      parts: ['LED backlight strip set', 'LED lenses', 'Power / LED driver board'],
+      tools: ['LED backlight tester', 'Digital multimeter', 'Suction cups', 'Plastic spudgers', 'Kapton tape'],
+      difficulty: 'Advanced', minutes: 150, safety: MAINS + ' Panels crack easily: lay face-down on a soft, flat surface and get help with screens over 50".', only: ['tv_television', 'computer_monitor'],
+    },
+    {
+      id: 'no-power-standby', title: 'Dead: no standby light, no response',
+      symptom: 'The {device} shows no standby LED and does not respond to the remote or buttons.',
+      causes: ['Blown mains fuse due to shorted bridge rectifier, MOSFET or PFC', 'Failed standby supply (5 V / 12 V standby rail)', 'Surge damage after load-shedding'],
+      tests: ['Check the mains fuse on the power board. If blown, check the bridge rectifier and main MOSFET for shorts before replacing.', 'Measure the standby rail at the mainboard connector: typically 5 V SB or 12 V SB.', 'Measure the main filter capacitor: ~310–380 V DC when plugged in (carefully).'],
+      fix: ['Replace shorted components and the fuse.', 'Replace swollen capacitors in the standby section.', 'Replace the power board if the controller IC is damaged.', 'Use a surge protector.'],
+      parts: ['Power board / PSU', 'Fuse', 'Electrolytic capacitors', 'MOSFET'],
+      tools: ['Digital multimeter', 'Soldering station', 'Isolation transformer (recommended)'],
+      difficulty: 'Advanced', minutes: 90, safety: MAINS,
+    },
+    {
+      id: 'boot-loop', title: 'Restart loop / stuck on logo',
+      symptom: 'The {model} shows the logo, goes black and restarts repeatedly, or freezes on the logo.',
+      causes: ['Corrupted firmware / eMMC failure', 'Power board voltage dropping when backlight turns on', 'Faulty backlight causing protection reset'],
+      tests: ['Unplug the backlight connector: if the loop stops, the backlight or driver is the cause.', 'Measure 12 V / 24 V rails while it boots: a dip below spec points at the power board.', 'Try a factory reset or USB firmware update from the manufacturer site.'],
+      fix: ['Re-flash firmware via USB (FAT32 stick, file in root).', 'Replace power board or backlight as identified.', 'eMMC failure: replace mainboard or have the eMMC re-programmed.'],
+      parts: ['Mainboard', 'Power board', 'USB stick'], tools: ['Digital multimeter', 'USB flash drive'],
+      difficulty: 'Moderate', minutes: 60, safety: MAINS, only: ['tv_television', 'projector', 'computer_monitor'],
+    },
+    {
+      id: 'lines-on-screen', title: 'Vertical / horizontal lines or half screen dark',
+      symptom: 'Coloured lines, a darker half or a band across the screen.',
+      causes: ['T-CON board fault', 'Loose or damaged LVDS / V-by-One cable', 'Panel COF (chip on film) failure', 'Gate driver short on the panel'],
+      tests: ['Check the TV menu: if the menu also shows lines, the fault is after the mainboard.', 'Reseat LVDS / FFC cables (power off).', 'Measure T-CON VGH / VGL / VDD: typical VDD 12 V or 5 V, VGH ~ 25–35 V, VGL ~ -6 V.', 'Press gently along the COF strips: if lines change, the COF bond is failing.'],
+      fix: ['Replace T-CON board or cables.', 'Panel-side faults usually mean panel replacement (often uneconomical).'],
+      parts: ['T-CON board', 'LVDS cable', 'Panel'], tools: ['Digital multimeter', 'Plastic spudgers'],
+      difficulty: 'Advanced', minutes: 90, safety: MAINS, only: ['tv_television', 'computer_monitor'],
+    },
+    {
+      id: 'no-signal-hdmi', title: 'No signal on HDMI / input not detected',
+      symptom: 'Source connected but "No signal" is shown.',
+      causes: ['Damaged HDMI port (ESD from hot-plugging)', 'HDMI-CEC handshake issue', 'Faulty cable / incompatible HDCP version'],
+      tests: ['Try another cable and port; set the input to the right HDMI.', 'Unplug both devices from mains for 2 minutes (resets HDCP / CEC).', 'Inspect the HDMI port pins with a magnifier.', 'Measure the 5 V pin (pin 18) from the source.'],
+      fix: ['Replace the HDMI port or ESD protection IC; update firmware.'], parts: ['HDMI port', 'ESD protection diode array'],
+      tools: ['Magnifier', 'Soldering station', 'Digital multimeter'], difficulty: 'Advanced', minutes: 60, safety: MAINS,
+    },
+    {
+      id: 'wifi-smart-apps', title: 'Wi-Fi drops / apps (DStv Now, Netflix, Showmax) not loading',
+      symptom: 'Smart TV loses Wi-Fi or apps freeze.',
+      causes: ['Weak signal / 2.4 GHz congestion', 'Outdated firmware', 'Wi-Fi module failure', 'Cache full'],
+      tests: ['Check signal strength in network settings; test with Ethernet.', 'Check date/time is correct (breaks HTTPS apps).'],
+      fix: ['Update firmware, clear app cache, use 5 GHz or Ethernet, replace Wi-Fi module.'], parts: ['Wi-Fi module'],
+      tools: ['Phone hotspot (for testing)'], difficulty: 'Easy', minutes: 20, safety: 'No internal work needed for software fixes.', only: ['tv_television', 'projector'],
+    },
+    {
+      id: 'remote-not-working', title: 'Remote not working',
+      symptom: 'TV ignores the remote but buttons on the set work.',
+      causes: ['Flat batteries / leaked cells', 'Worn rubber keypad contacts', 'IR receiver fault'],
+      tests: ['Phone camera test on the remote LED.', 'Measure IR receiver: 5 V supply and output pulsing when keys pressed.'],
+      fix: ['Clean contacts with isopropyl; conductive paint on pads; replace IR receiver or remote.'], parts: ['Remote', 'IR receiver'],
+      tools: ['Phone camera', 'Isopropyl alcohol'], difficulty: 'Easy', minutes: 15, safety: 'Batteries: clean leaked alkaline with vinegar.',
+    },
+    {
+      id: 'projector-lamp', title: 'Lamp / light source warning, dim image',
+      symptom: 'Image is dim or lamp LED flashes.',
+      causes: ['Lamp at end of life (2 000–5 000 h)', 'Clogged dust filter overheating', 'Ballast fault', 'Colour wheel failure (DLP)'],
+      tests: ['Check lamp hours in the service menu.', 'Clean filter and check fan.', 'Listen for colour wheel spin on DLP.'],
+      fix: ['Replace lamp module and reset hours; clean optics; replace ballast.'], parts: ['Lamp module', 'Ballast', 'Dust filter'],
+      tools: ['Screwdrivers', 'Air blower'], difficulty: 'Easy', minutes: 30, safety: 'Lamps reach 900 °C and contain mercury: let cool 30 min and handle the module by its frame.', only: ['projector'],
+    },
+    {
+      id: 'dead-pixels-dots', title: 'White spots or bright dots across the screen',
+      symptom: 'Bright white spots appear evenly across the picture.',
+      causes: ['LED lenses fallen off inside the backlight', 'Reflector sheet damage'],
+      tests: ['Open the panel and inspect each LED lens.'],
+      fix: ['Re-glue lenses with clear epoxy in the correct orientation.'], parts: ['LED lenses', 'Epoxy'],
+      tools: ['Suction cups', 'Spudgers'], difficulty: 'Advanced', minutes: 120, safety: MAINS, only: ['tv_television'],
+    },
+  ],
+  brandNotes: {
+    samsung: { '*': 'Samsung: enter service menu with Info–Menu–Mute–Power (from standby). Common: BN44 power boards, LED strips on Crystal UHD (TU/AU/BU/CU), One Connect issues on QN-series.' },
+    lg: { '*': 'LG: service menu via the "In-Start" key on a service remote; OLED panels can show uneven brightness from compensation cycles — run Pixel Refresher before condemning.' },
+    hisense: { '*': 'Hisense: many models use Vidaa OS; LED strips (e.g. HD500DU-E) and RSAG power boards are common spares.' },
+    tcl: { '*': 'TCL: common faults are backlight strips and 40-MS series mainboards; firmware via USB.' },
+    sinotec: { '*': 'Sinotec: SA budget brand on universal combo boards (e.g. TP.MS338 / CV338H). Firmware must match the panel.' },
+    telefunken: { '*': 'Telefunken (SA): uses universal combo boards; LED strips are shared with other budget brands of the same panel size.' },
+    jvc: { '*': 'JVC (SA, Android TV): common Shenzhen mainboards; check the panel code on the T-CON label.' },
+    sony: { '*': 'Sony: count the red standby LED flashes (e.g. 2 = power, 6 = backlight).' },
+    philips: { '*': 'Philips: Ambilight models have an extra LED board; check its fuse if the TV powers down.' },
+    skyworth: { '*': 'Skyworth: Android TVs; frequent backlight strip replacements.' },
+    dell: { '*': 'Dell monitors: built-in self-test (hold button 1 while powering) shows if the panel works without input.' },
+    asus: { '*': 'ASUS monitors: firmware updates via DisplayWidget Center fix many HDMI handshake issues.' },
+  },
+  sizeNote: (size, typeKey, issueId) => {
+    const inch = parseFloat(size);
+    if (!inch || (typeKey !== 'tv_television' && typeKey !== 'computer_monitor')) return undefined;
+    if (issueId === 'sound-no-picture' || issueId === 'dead-pixels-dots') {
+      if (inch <= 32) return `${size} panels typically use 2–3 strips of 6–10 LEDs (often 3 V LEDs).`;
+      if (inch <= 43) return `${size} panels typically use 3–5 strips of 5–10 LEDs (3 V or 6 V).`;
+      if (inch <= 55) return `${size} panels typically use 4–10 strips; budget direct-lit models often 6 V LEDs.`;
+      return `${size} panels use 8–16 strips or full-array zones; get a second person to lift the panel.`;
+    }
+    return undefined;
+  },
+};
+
+export const audio: FamilyLibrary = {
+  issues: [
+    {
+      id: 'no-sound', title: 'Powers on but no sound',
+      symptom: 'The {brand} {model} lights up but nothing comes out of the speakers.',
+      causes: ['Wrong input / muted', 'Amplifier protection mode (DC offset or shorted speaker)', 'Blown speaker driver', 'Failed class-D amp IC (e.g. TPA3116, TAS5xxx)'],
+      tests: ['Try another source and input; reset to factory defaults.', 'Measure speaker driver resistance: 4 Ω or 8 Ω drivers read ~3.2 / 6.5 Ω DC. OL = blown coil.', 'Measure amp supply rail (12–24 V portable, ±30–60 V hi-fi).', 'Check for DC at speaker outputs (should be < 50 mV).'],
+      fix: ['Replace driver or amp IC; replace protection relay on hi-fi amps; re-solder cracked joints on the amp board.'],
+      parts: ['Speaker driver', 'Amplifier IC', 'Protection relay'], tools: ['Digital multimeter', 'Soldering iron', 'Audio test tone'],
+      difficulty: 'Moderate', minutes: 60, safety: 'Unplug mains-powered units; amplifier rails and capacitors can hold dangerous voltage.',
+    },
+    {
+      id: 'bluetooth-pairing', title: 'Bluetooth will not pair or keeps dropping',
+      symptom: 'The {device} does not show up on the phone or cuts out.',
+      causes: ['Pairing list full', 'Interference (Wi-Fi 2.4 GHz)', 'Firmware bug', 'Damaged BT antenna / module'],
+      tests: ['Forget the device on the phone; factory reset the speaker (often hold Power + Vol- or BT for 10 s).', 'Test within 1 m of the phone.'],
+      fix: ['Update firmware via the brand app; reseat or replace antenna / BT module.'], parts: ['Bluetooth module', 'Antenna'],
+      tools: ['Phone', 'Brand app'], difficulty: 'Easy', minutes: 15, safety: 'No internal work for resets.', not: ['amplifier', 'microphone', 'subwoofer'],
+    },
+    {
+      id: 'battery-not-charging', title: 'Battery not charging / short runtime',
+      symptom: 'Charge LED does not light or the device dies quickly.',
+      causes: ['Worn charging port (USB-C / micro-USB)', 'Degraded Li-ion pack', 'Charging IC failure'],
+      tests: ['Use a USB power meter to see if current is drawn (0 A = port / IC issue).', 'Measure pack voltage: 3.0–4.2 V per cell (2S packs 6–8.4 V).'],
+      fix: ['Replace port (or the charging daughterboard), replace pack with same capacity and connector.'], parts: ['Charging port board', 'Li-ion battery'],
+      tools: ['USB power meter', 'Digital multimeter', 'Hot-air station'], difficulty: 'Moderate', minutes: 60, safety: LIION,
+      only: ['speaker', 'headphones', 'wireless_earbuds', 'radio', 'smart_speaker'],
+    },
+    {
+      id: 'distortion-crackle', title: 'Crackling, distortion or hum',
+      symptom: 'Audio crackles or distorts at higher volume.',
+      causes: ['Torn speaker cone / surround', 'Dirty volume pot', 'Dried capacitors in the amp', 'Ground loop (hum)'],
+      tests: ['Swap speakers between channels: if the fault follows, it is the speaker.', 'Rotate the volume knob: scratchy noise = dirty pot.', 'Unplug other connected gear to check for ground loops.'],
+      fix: ['Re-foam the surround; contact cleaner (DeoxIT) on pots; recap the amp; use a ground loop isolator.'], parts: ['Surround kit', 'Capacitors', 'Ground loop isolator'],
+      tools: ['Contact cleaner', 'Soldering iron'], difficulty: 'Moderate', minutes: 60, safety: 'Unplug mains units.',
+    },
+    {
+      id: 'one-side-dead', title: 'One earbud / one side silent',
+      symptom: 'Only one side plays.',
+      causes: ['Earbud not charged (dirty pogo pins)', 'Out of sync after one bud was reset', 'Earwax blocking mesh', 'Broken cable (wired)'],
+      tests: ['Clean the charging pins with isopropyl; check the bud LED when docked.', 'Factory reset both buds in the case.', 'Wiggle the cable near the plug.'],
+      fix: ['Clean meshes with a soft brush; re-pair; repair or replace cable / bud.'], parts: ['Replacement earbud', 'Ear tips', 'Cable'],
+      tools: ['Isopropyl alcohol', 'Soft brush'], difficulty: 'Easy', minutes: 15, safety: 'Avoid liquid in the mesh.', only: ['headphones', 'wireless_earbuds'],
+    },
+    {
+      id: 'amp-protect', title: 'Amplifier goes into protect mode',
+      symptom: 'Protect LED / relay clicks off soon after switch on.',
+      causes: ['Shorted speaker wire', 'Failed output transistors', 'Overheating (blocked vents)', 'DC offset'],
+      tests: ['Disconnect speakers: if protection clears, check wiring.', 'Measure output transistors (diode test) for shorts.', 'Measure DC offset at outputs (< 50 mV).'],
+      fix: ['Fix wiring, replace output transistors and emitter resistors, set bias per service manual.'], parts: ['Output transistors', 'Emitter resistors'],
+      tools: ['Digital multimeter', 'Dim-bulb tester', 'Soldering station'], difficulty: 'Expert', minutes: 120,
+      safety: 'Use a dim-bulb tester when powering a repaired amp the first time.', only: ['amplifier', 'subwoofer', 'soundbar'],
+    },
+    {
+      id: 'soundbar-hdmi-arc', title: 'Soundbar not working on HDMI ARC / eARC',
+      symptom: 'TV sound will not route to the soundbar.',
+      causes: ['ARC/CEC disabled on TV', 'Wrong HDMI port (must be ARC)', 'Cable not high-speed'],
+      tests: ['Enable HDMI-CEC (Anynet+ / SimpLink / Bravia Sync) and set TV audio to external receiver.', 'Try optical as a test.'],
+      fix: ['Use the ARC port and a high-speed cable; update both firmwares.'], parts: ['High-speed HDMI cable'],
+      tools: [], difficulty: 'Easy', minutes: 15, safety: 'None.', only: ['soundbar'],
+    },
+    {
+      id: 'mic-no-signal', title: 'Microphone: no signal or very low output',
+      symptom: 'Recording is silent or very quiet.',
+      causes: ['Phantom power off (condenser mics)', 'Broken XLR cable', 'Dented capsule'],
+      tests: ['Check 48 V phantom is enabled; test with another cable; measure XLR pin continuity (pin 2 hot, 3 cold, 1 ground).'],
+      fix: ['Replace cable; resolder XLR; replace capsule.'], parts: ['XLR cable', 'Capsule'],
+      tools: ['Digital multimeter', 'Soldering iron'], difficulty: 'Easy', minutes: 20, safety: 'Turn phantom off before connecting.', only: ['microphone'],
+    },
+    {
+      id: 'radio-reception', title: 'Poor radio reception',
+      symptom: 'Stations are noisy or not found.',
+      causes: ['Antenna disconnected', 'Detuned front end', 'Switching charger interference'],
+      tests: ['Extend antenna, try battery power to rule out charger noise.'],
+      fix: ['Resolder antenna; use a ferrite on the charger cable.'], parts: ['Telescopic antenna', 'Ferrite core'],
+      tools: ['Soldering iron'], difficulty: 'Easy', minutes: 20, safety: 'Unplug mains.', only: ['radio'],
+    },
+  ],
+  brandNotes: {
+    jbl: { '*': 'JBL Flip / Charge: charging port flex and battery are the most common replacements; reset by holding Play + Volume+.' },
+    sony: { '*': 'Sony WH-1000XM: headband cracks and hinge failures are common; reset via power + custom button 7 s.' },
+    apple: { '*': 'Apple AirPods: not designed to be opened; replacement buds are bought individually from Apple.' },
+    samsung: { '*': 'Samsung Galaxy Buds: reset in the Wearable app; case pogo pins corrode.' },
+    bose: { '*': 'Bose SoundLink: update via Bose app; battery replacements need careful glue removal.' },
+    yamaha: { '*': 'Yamaha AV receivers: "PROTECTION" message often related to HDMI board or amp section.' },
+    defy: { '*': '' },
+  },
+};
+
+export const media: FamilyLibrary = {
+  issues: [
+    {
+      id: 'no-signal-e48', title: 'No signal / E48-32 (satellite decoder)',
+      symptom: 'The {model} shows E48-32 "No signal" or loses channels in bad weather.',
+      causes: ['LNB fault or water ingress', 'Dish misalignment after wind', 'Corroded F-connectors / damaged coax', 'Decoder tuner fault'],
+      tests: ['Check signal strength and quality in the decoder menu (Signal Information).', 'Measure LNB voltage at the decoder output: 13 V / 18 V DC (Smart LNB on Explora uses a different supply).', 'Inspect F-connectors for green corrosion; replace bad ones.', 'Test with a second decoder if available.'],
+      fix: ['Re-terminate F-connectors with compression fittings and self-amalgamating tape.', 'Re-align the dish (Intelsat 20 at 68.5° E for DStv) with a signal meter.', 'Replace the LNB (Smart LNB for Explora Ultra / Streama-compatible).'],
+      parts: ['LNB', 'RG6 coax', 'Compression F-connectors'], tools: ['Satellite finder / meter', 'Compression tool', 'Spanners'],
+      difficulty: 'Moderate', minutes: 60, safety: 'Use a secure ladder; never work on a roof alone or in wind. Accredited installers are recommended for warranty.',
+      only: ['set_top_box'],
+    },
+    {
+      id: 'decoder-stuck-boot', title: 'Stuck on "Loading" / boot screen',
+      symptom: 'Decoder hangs on the logo or loading screen.',
+      causes: ['Software update interrupted (load-shedding)', 'Hard drive failure (PVR decoders)', 'Power supply capacitor failure'],
+      tests: ['Power-cycle: unplug 30 s.', 'Perform a reset / software download from the front-panel button combination.', 'PVR: listen for clicking hard drive; check the HDD SMART status in the menu if reachable.'],
+      fix: ['Force software download; replace the HDD (format via decoder); replace PSU capacitors.'], parts: ['Hard drive', 'Power supply / capacitors'],
+      tools: ['Digital multimeter', 'Soldering iron'], difficulty: 'Moderate', minutes: 45, safety: MAINS,
+    },
+    {
+      id: 'remote-unpaired', title: 'Remote not working / unpaired',
+      symptom: 'Decoder or player ignores the remote.',
+      causes: ['Flat batteries', 'RF remote unpaired from decoder', 'Front panel IR receiver fault'],
+      tests: ['Phone camera test for IR; re-pair RF remote using the brand sequence.'],
+      fix: ['Replace batteries; re-pair; replace remote.'], parts: ['Remote'], tools: ['Phone camera'],
+      difficulty: 'Easy', minutes: 10, safety: 'None.',
+    },
+    {
+      id: 'disc-not-reading', title: 'Disc not read / "No disc"',
+      symptom: 'Discs spin but are not recognised.',
+      causes: ['Dirty laser lens', 'Worn optical pickup (laser)', 'Tray belt slipping'],
+      tests: ['Try a known good disc; clean lens with a cotton bud and isopropyl.', 'Check tray opens smoothly.'],
+      fix: ['Clean lens; replace belt; replace optical pickup (match part number).'], parts: ['Optical pickup', 'Tray belt'],
+      tools: ['Cotton buds', 'Isopropyl alcohol', 'Screwdrivers'], difficulty: 'Moderate', minutes: 45, safety: 'Never look into the laser.', only: ['bluray_player'],
+    },
+    {
+      id: 'streaming-buffering', title: 'Streaming buffers or app crashes',
+      symptom: 'Netflix / Showmax / YouTube buffers or crashes.',
+      causes: ['Weak Wi-Fi', 'Storage full', 'Outdated firmware', 'Overheating stick (behind TV)'],
+      tests: ['Run the speed test in settings; clear cache; check temperature.'],
+      fix: ['Use HDMI extender to move the stick away from the TV; update; factory reset.'], parts: ['HDMI extender', 'USB power adapter'],
+      tools: [], difficulty: 'Easy', minutes: 15, safety: 'None.', only: ['streaming_device', 'set_top_box'],
+    },
+    {
+      id: 'no-power-adapter', title: 'Dead: no lights on the front panel',
+      symptom: 'No power indication.',
+      causes: ['Failed external power adapter (12 V)', 'Internal PSU capacitor failure', 'Surge damage'],
+      tests: ['Measure adapter output: e.g. 12 V DC; check under load.', 'Inspect internal PSU for bulging capacitors.'],
+      fix: ['Replace adapter (same voltage, polarity and ≥ current rating); recap PSU.'], parts: ['Power adapter', 'Capacitors'],
+      tools: ['Digital multimeter'], difficulty: 'Moderate', minutes: 30, safety: MAINS,
+    },
+  ],
+  brandNotes: {
+    multichoice: { '*': 'DStv (MultiChoice): reset with "Reset decoder" via the Self Service app or SMS; E16-4 = not authorised (needs reconnection), E48-32 = no signal, E30-32 = Smart LNB connection on Explora.' },
+    dstv: { '*': 'DStv (MultiChoice): E16-4 = subscription / not authorised (clear via app), E48-32 = no signal, E30-32 = Explora Smart LNB connection error.' },
+    openview: { '*': 'Openview: free-to-air on Intelsat 20; activation errors are fixed by re-activating with the smartcard number.' },
+    starsat: { '*': 'StarSat: uses a different satellite position; dish re-alignment is the most common fix.' },
+  },
+};
+
+export const gaming: FamilyLibrary = {
+  issues: [
+    {
+      id: 'no-video-hdmi', title: 'No video output (HDMI)',
+      symptom: 'Console powers on, fan spins, but the TV shows no signal.',
+      causes: ['Damaged HDMI port pins (very common on PS5 / PS4 / Xbox One)', 'HDMI retimer / encoder chip failure', 'Wrong resolution mode'],
+      tests: ['Try safe mode (PS: hold power until second beep) to reset resolution.', 'Inspect HDMI port pins under magnification for bent or missing pins.', 'Measure resistance of each HDMI data line to ground versus a good console.'],
+      fix: ['Micro-solder a new HDMI port (hot air + flux); replace the retimer IC if damaged.'], parts: ['HDMI port', 'HDMI retimer IC'],
+      tools: ['Hot air station', 'Microscope', 'Flux', 'Digital multimeter'], difficulty: 'Expert', minutes: 120, safety: MAINS, only: ['gaming_console'],
+    },
+    {
+      id: 'overheating-shutdown', title: 'Overheating / loud fan / shuts down',
+      symptom: 'Fan is very loud and the console switches off during games.',
+      causes: ['Dust-packed heatsink and fan', 'Dried thermal paste / liquid metal migration', 'Poor ventilation'],
+      tests: ['Check the fan spins freely; check the exhaust temperature.'],
+      fix: ['Clean dust (PS5 has dust ports), replace thermal paste (not on PS5 liquid metal unless experienced).'], parts: ['Thermal paste', 'Fan'],
+      tools: ['Compressed air', 'Screwdrivers (T8/T10 security)'], difficulty: 'Moderate', minutes: 60, safety: MAINS,
+      only: ['gaming_console', 'vr_headset'],
+    },
+    {
+      id: 'stick-drift', title: 'Analogue stick drift',
+      symptom: 'Character or camera moves without touching the stick.',
+      causes: ['Worn potentiometer track', 'Dirt in the stick module'],
+      tests: ['Check drift in the console calibration screen / gamepad tester.'],
+      fix: ['Clean with isopropyl via the stick base; replace the analogue module (or upgrade to Hall-effect sticks).'], parts: ['Analogue stick module', 'Hall-effect stick'],
+      tools: ['Soldering iron', 'Desoldering pump', 'Tri-wing / Phillips drivers'], difficulty: 'Advanced', minutes: 60, safety: LIION, only: ['game_controller'],
+    },
+    {
+      id: 'controller-not-charging', title: 'Controller not charging / not pairing',
+      symptom: 'No charge LED; will not connect.',
+      causes: ['Worn USB-C / micro-USB port', 'Battery degraded', 'Reset needed'],
+      tests: ['Reset (DualSense: pin-hole button on back 5 s).', 'USB power meter current check.'],
+      fix: ['Replace port or battery.'], parts: ['USB-C port', 'Battery'],
+      tools: ['USB power meter', 'Hot-air station'], difficulty: 'Advanced', minutes: 60, safety: LIION, only: ['game_controller'],
+    },
+    {
+      id: 'disc-drive', title: 'Disc not reading / ejecting',
+      symptom: 'Discs eject or are not recognised.',
+      causes: ['Laser degradation', 'Drive board fault', 'Dirty lens'],
+      tests: ['Try multiple discs; listen to the drive.'],
+      fix: ['Replace drive (drive board is paired to motherboard on PS4 / PS5 / Xbox; keep the original board).'], parts: ['Disc drive', 'Laser'],
+      tools: ['Screwdrivers'], difficulty: 'Advanced', minutes: 75, safety: MAINS, only: ['gaming_console'],
+    },
+    {
+      id: 'no-power-console', title: 'No power / blue light of death',
+      symptom: 'Console does not boot or shows a pulsing light.',
+      causes: ['Internal PSU failure', 'APU / GPU solder failure', 'Corrupted system software'],
+      tests: ['Try a known-good power cable; safe mode / offline system update.', 'Measure PSU 12 V output.'],
+      fix: ['Replace internal PSU; reinstall system software; board-level repair for APU.'], parts: ['Internal PSU'],
+      tools: ['Digital multimeter'], difficulty: 'Advanced', minutes: 90, safety: MAINS, only: ['gaming_console'],
+    },
+    {
+      id: 'vr-tracking', title: 'VR tracking lost / controllers drift',
+      symptom: 'Guardian lost or controllers drift.',
+      causes: ['Poor lighting / reflections', 'Dirty tracking cameras', 'Controller battery low'],
+      tests: ['Clean cameras with a microfibre cloth; check room lighting.'],
+      fix: ['Reset Guardian; replace batteries; update firmware.'], parts: ['Batteries'],
+      tools: ['Microfibre cloth'], difficulty: 'Easy', minutes: 15, safety: 'Keep lenses out of direct sunlight (burns the displays).', only: ['vr_headset'],
+    },
+    {
+      id: 'switch-joycon', title: 'Joy-Con disconnecting / not detected',
+      symptom: 'Controller disconnects from the Switch.',
+      causes: ['Rail connector worn', 'Antenna cable loose'],
+      tests: ['Check rail pins; re-sync in settings.'],
+      fix: ['Replace rail connector or antenna ribbon.'], parts: ['Rail connector'],
+      tools: ['Tri-wing Y00 driver'], difficulty: 'Moderate', minutes: 45, safety: LIION, only: ['game_controller', 'gaming_console'],
+    },
+  ],
+  brandNotes: {
+    sony: { '*': 'PlayStation: Safe Mode = hold power until the second beep. PS5 HDMI ports and PS4 APU reflows are common bench jobs.' },
+    playstation: { '*': 'PlayStation: Safe Mode = hold power until the second beep.' },
+    microsoft: { '*': 'Xbox: offline system update (OSU1) via USB fixes many boot issues.' },
+    xbox: { '*': 'Xbox: offline system update (OSU1) via USB fixes many boot issues.' },
+    nintendo: { '*': 'Nintendo Switch: M92T36 charging IC and fan failures are common; Joy-Con drift kits widely available.' },
+    meta: { '*': 'Meta Quest: factory reset via volume- + power at boot.' },
+  },
+};

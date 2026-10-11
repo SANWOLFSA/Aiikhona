@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import Header from './components/Header';
 import Navigation from './components/Navigation';
 import Sidebar from './components/Sidebar';
@@ -12,7 +12,6 @@ import Marketplace from './components/Marketplace';
 import Courses from './components/Courses';
 import Forum from './components/Forum';
 import UserProgress from './components/UserProgress';
-import AdminDesk from './components/AdminDesk';
 import AuthModal from './components/AuthModal';
 import LandingPage from './components/LandingPage';
 import AiAssistantView from './components/AiAssistantView';
@@ -23,21 +22,55 @@ import HelpView from './components/HelpView';
 import UserDatabaseManager from './components/UserDatabaseManager';
 import FileStorageManager from './components/FileStorageManager';
 import HomeFeed from './components/HomeFeed';
-import DeviceDirectoryView from './components/DeviceDirectoryView';
+import DeviceDirectoryView from './components/catalog/LazyDeviceDirectory';
+import { usePathname, navigate } from './hooks/usePathname';
+import SessionTimeoutWatcher from './components/SessionTimeoutWatcher';
+import NotFound from './components/NotFound';
+const TheoryHub = lazy(() => import('./components/theory/TheoryHub'));
+const MultimeterPage = lazy(() => import('./components/meter/MultimeterPage'));
+const AdminDesk = lazy(() => import('./components/AdminDesk'));
+const HubRoutes = lazy(() => import('./components/hub/HubRoutes'));
+import { useAdminStatus } from './lib/admin';
+import { usePendingVerificationsCount } from './lib/marketplace';
 import { storage } from './lib/storage';
-import { APP_THEMES, getNextThemeId } from './lib/theme';
-import { auth, db } from './lib/firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { APP_THEMES, DEFAULT_THEME_ID, getNextThemeId } from './lib/theme';
+import { auth, db, isFirebaseConfigured } from './lib/firebase';
+import { onAuthStateChanged, signOut, type User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { initialGuides, initialParts, initialCourses, initialPosts, initialVerifications } from './data';
-import type { UserProfile, Guide, SparePart, Course, ForumPost, VerificationRequest } from './types';
+import { initialGuides, initialParts, initialCourses, initialPosts } from './data';
+import type { UserProfile, Guide, SparePart, Course, ForumPost } from './types';
+
+const ROUTED_TABS = ['home', 'devices', 'phones', 'blueprint_viewer', '3d_viewer', 'social_annotator', 'guides', 'diagnostic', 'circuit', 'parts', 'marketplace', 'studies', 'theory', 'multimeter', 'forum', 'ai_assistant', 'user_db', 'file_storage', 'settings', 'about', 'help', 'progress', 'admin', 'search', 'device', 'components', 'answers', 'teardowns', 'contributors'];
+const TAB_ALIASES: Record<string, string> = { learning: 'studies', electrical_theory: 'theory', exam_room: 'theory' };
+function pathForTab(tab: string): string {
+  const t = TAB_ALIASES[tab] || tab;
+  return t === 'home' ? '/' : `/${t.replace(/_/g, '-')}`;
+}
+/** Repair hub pages (universal search, device & component pages, Answers, teardowns, guide editor/viewer). */
+function isHubPath(pathname: string): boolean {
+  return /^\/(search|device|components|answers|teardowns|contributors)(\/|$)/.test(pathname) || /^\/guides\/(new|edit|view)(\/|$)/.test(pathname);
+}
+const hubFallback = <div className="p-10 text-center text-sm text-slate-500">Loading…</div>;
+function tabFromPath(pathname: string): string {
+  const seg = (pathname.split('/')[1] || '').replace(/-/g, '_');
+  const t = TAB_ALIASES[seg] || seg;
+  if (!t) return 'home';
+  return ROUTED_TABS.includes(t) ? t : 'not_found';
+}
 
 export default function App() {
   const [darkMode, setDarkMode] = useState<boolean>(() => storage.getDarkMode());
   const [themeId, setThemeId] = useState<string>(() => storage.getAppTheme());
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => storage.getIsAuthenticated());
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => storage.getUserProfile());
-  const [activeTab, setActiveTab] = useState('home');
+  // Main tabs are synced with the URL path (/devices, /guides, /marketplace, ...) so links are shareable
+  // and browser back/forward work. Sub-paths (e.g. /devices/tv/samsung/...) belong to the tab's own router.
+  const { pathname, search: urlSearch } = usePathname();
+  const activeTab = tabFromPath(pathname);
+  const isHub = isHubPath(pathname);
+  // ?q= deep links (e.g. /marketplace?q=iPhone 13 battery from a device page) prefill the tab's search.
+  const urlQ = urlSearch.get('q') || '';
+  const setActiveTab = (tab: string) => navigate(pathForTab(tab));
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,17 +79,20 @@ export default function App() {
   const [parts, setParts] = useState<SparePart[]>(initialParts);
   const [courses, setCourses] = useState<Course[]>(initialCourses);
   const [posts, setPosts] = useState<ForumPost[]>(initialPosts);
-  const [verifications, setVerifications] = useState<VerificationRequest[]>(() => {
-    const saved = storage.getVerificationRequests();
-    return saved.length > 0 ? saved : initialVerifications;
-  });
+  // Admin UI visibility comes from Firebase (claim / admins doc / users.role, or the
+  // VITE_ADMIN_EMAILS bootstrap list). Real authority is enforced by the security rules.
+  const adminStatus = useAdminStatus();
+  const isAdmin = adminStatus.isAdmin;
+  const pendingVerificationsCount = usePendingVerificationsCount(isAdmin);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [authChecked, setAuthChecked] = useState<boolean>(!isFirebaseConfigured);
   
   const [savedGuideIds, setSavedGuideIds] = useState<string[]>(() => storage.getSavedGuideIds());
   const [selectedGuide, setSelectedGuide] = useState<Guide | null>(null);
   const [initialSearchQuery, setInitialSearchQuery] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const currentTheme = APP_THEMES[themeId] || APP_THEMES['obsidian-sapphire'];
+  const currentTheme = APP_THEMES[themeId] || APP_THEMES[DEFAULT_THEME_ID];
 
   const handleCycleTheme = () => {
     const next = getNextThemeId(themeId);
@@ -80,6 +116,8 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setFirebaseUser(firebaseUser);
+      setAuthChecked(true);
       if (firebaseUser) {
         try {
           const docRef = doc(db, 'users', firebaseUser.uid);
@@ -98,6 +136,12 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Non-admins who land on /admin are sent home once auth + admin checks resolve.
+  const adminResolved = authChecked && (!firebaseUser || (adminStatus.uid === firebaseUser.uid && !adminStatus.loading));
+  useEffect(() => {
+    if (activeTab === 'admin' && adminResolved && !isAdmin) navigate('/', { replace: true });
+  }, [activeTab, adminResolved, isAdmin]);
 
   const handleToggleSaveGuide = (guide: Guide) => {
     const newSavedIds = storage.toggleSaveGuide(guide.id);
@@ -130,47 +174,6 @@ export default function App() {
   const handleSelectMarketplace = (brand: string) => {
     setInitialSearchQuery(brand);
     setActiveTab('marketplace');
-  };
-
-  const handleVerificationRequest = (request: VerificationRequest) => {
-    const newRequests = [request, ...verifications];
-    setVerifications(newRequests);
-    storage.saveVerificationRequests(newRequests);
-  };
-
-  const handleApproveVerification = (id: string) => {
-    const request = verifications.find(v => v.id === id);
-    const newRequests = verifications.map(v => 
-      v.id === id 
-        ? { ...v, status: 'Approved (Verified)', reviewerNotes: 'Verified official trading registration papers. Authenticated company.' } 
-        : v
-    );
-    setVerifications(newRequests);
-    storage.saveVerificationRequests(newRequests);
-    
-    if (request) {
-      setPosts(prev => prev.map(p => {
-        if (p.author.name.toLowerCase().includes(request.companyName.toLowerCase()) || request.companyName.toLowerCase().includes(p.author.name.toLowerCase())) {
-          return { ...p, author: { ...p.author, isVerifiedCompany: true } };
-        }
-        return p;
-      }));
-      
-      setParts(prev => prev.map(p => {
-        if (p.supplier.name.toLowerCase().includes(request.companyName.toLowerCase()) || request.companyName.toLowerCase().includes(p.supplier.name.toLowerCase())) {
-          return { ...p, supplier: { ...p.supplier, isVerifiedCompany: true } };
-        }
-        return p;
-      }));
-    }
-  };
-
-  const handleRejectVerification = (id: string, reason: string) => {
-    const newRequests = verifications.map(v => 
-      v.id === id ? { ...v, status: 'Rejected', reviewerNotes: reason } : v
-    );
-    setVerifications(newRequests);
-    storage.saveVerificationRequests(newRequests);
   };
 
   const handleAddPost = (post: ForumPost) => {
@@ -254,7 +257,6 @@ export default function App() {
     storage.clearSession();
   };
 
-  const pendingVerificationsCount = verifications.filter(v => v.status === 'Pending Review').length;
 
   if (!isAuthenticated) {
     return (
@@ -302,12 +304,13 @@ export default function App() {
       <Navigation 
         activeTab={activeTab} 
         onSelectTab={(tabId: string) => {
-          if (tabId === 'admin' && currentUser?.email !== 'sbheko1@gmail.com' && currentUser?.email !== 'diy.electronicsa@gmail.com') return;
+          if (tabId === 'admin' && !isAdmin) return;
           setActiveTab(tabId);
           setInitialSearchQuery(''); // Clear cross-tab triggers
         }} 
         pendingVerificationsCount={pendingVerificationsCount}
         currentUser={currentUser}
+        isAdmin={isAdmin}
         themeConfig={currentTheme}
       />
       
@@ -315,7 +318,7 @@ export default function App() {
         <Sidebar 
           activeTab={activeTab} 
           onSelectTab={(tabId: string) => {
-            if (tabId === 'admin' && currentUser?.email !== 'sbheko1@gmail.com' && currentUser?.email !== 'diy.electronicsa@gmail.com') return;
+            if (tabId === 'admin' && !isAdmin) return;
             if (tabId === 'devices') setActiveTab('devices');
             else if (tabId === 'learning') setActiveTab('studies');
             else if (tabId === 'marketplace') setActiveTab('marketplace');
@@ -332,11 +335,13 @@ export default function App() {
           isOpen={isSidebarOpen}
           onCloseMobile={() => setIsSidebarOpen(false)}
           currentUser={currentUser}
+          isAdmin={isAdmin}
           pendingVerificationsCount={pendingVerificationsCount}
           themeConfig={currentTheme}
         />
         
         <main className="flex-1 w-full pb-16 min-w-0 max-w-7xl mx-auto">
+          {activeTab === 'not_found' && <NotFound onGoHome={() => setActiveTab('home')} />}
           {activeTab === 'home' && (
             <HomeFeed 
               posts={posts} 
@@ -345,6 +350,8 @@ export default function App() {
               onAddReply={handleAddReply} 
               onToggleLike={handleToggleLike} 
               themeConfig={currentTheme} 
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+              onSelectMarketplace={handleSelectMarketplace}
             />
           )}
           {activeTab === 'devices' && (
@@ -352,6 +359,7 @@ export default function App() {
               savedGuideIds={savedGuideIds} 
               onToggleSaveGuide={handleToggleSaveGuide}
               onSourcePart={handleSourcePart}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
             />
           )}
           {activeTab === 'phones' && <PhonesPage themeConfig={currentTheme} onNavigateTo3D={() => setActiveTab('blueprint_viewer')} />}
@@ -360,9 +368,20 @@ export default function App() {
               themeConfig={currentTheme} 
               currentUser={currentUser}
               initialView={activeTab === 'social_annotator' ? 'annotator' : 'boardview'}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
             />
           )}
-          {activeTab === 'guides' && (
+          {isHub && (
+            <Suspense fallback={hubFallback}>
+              <HubRoutes onOpenAuth={() => setIsAuthModalOpen(true)} />
+            </Suspense>
+          )}
+          {activeTab === 'guides' && !isHub && (
+            <Suspense fallback={hubFallback}>
+              <HubRoutes onOpenAuth={() => setIsAuthModalOpen(true)} />
+            </Suspense>
+          )}
+          {activeTab === 'guides' && !isHub && (
             <RepairGuides 
               guides={guides} 
               savedGuideIds={savedGuideIds} 
@@ -370,7 +389,7 @@ export default function App() {
               onSelectGuide={(guide) => setSelectedGuide(guide)}
               isOfflineOnly={isOfflineMode}
               onToggleOfflineOnly={() => setIsOfflineMode(!isOfflineMode)}
-              initialSearchQuery={searchQuery}
+              initialSearchQuery={searchQuery || urlQ}
               onNavigateToDiagnostic={() => setActiveTab('diagnostic')}
               onSourcePart={handleSourcePart}
             />
@@ -391,17 +410,30 @@ export default function App() {
           {activeTab === 'parts' && (
             <SpareParts 
               parts={parts} 
-              initialSearchQuery={initialSearchQuery || searchQuery} 
+              initialSearchQuery={initialSearchQuery || searchQuery || urlQ} 
               onSelectMarketplace={handleSelectMarketplace}
             />
           )}
           
           {activeTab === 'marketplace' && (
             <Marketplace 
-              initialSearchQuery={initialSearchQuery || searchQuery} 
-              onRequestVerification={handleVerificationRequest}
+              initialSearchQuery={initialSearchQuery || searchQuery || urlQ} 
               onSelectPartDetail={handleSourcePart}
+              themeConfig={currentTheme}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
             />
+          )}
+
+          {activeTab === 'theory' && (
+            <Suspense fallback={<div className="p-10 text-center text-sm text-slate-500">Loading Electrical Theory…</div>}>
+              <TheoryHub themeConfig={currentTheme} />
+            </Suspense>
+          )}
+
+          {activeTab === 'multimeter' && (
+            <Suspense fallback={<div className="p-10 text-center text-sm text-slate-500">Loading Multimeter Lab…</div>}>
+              <MultimeterPage themeConfig={currentTheme} />
+            </Suspense>
           )}
 
           {activeTab === 'studies' && (
@@ -453,7 +485,7 @@ export default function App() {
           )}
 
           {activeTab === 'help' && (
-            <HelpView />
+            <HelpView onNavigate={setActiveTab} />
           )}
 
           {activeTab === 'progress' && (
@@ -463,15 +495,14 @@ export default function App() {
               onOpenGuide={(g) => setSelectedGuide(g)}
               onRemoveSavedGuide={handleToggleSaveGuide}
               onNavigateToGuides={() => setActiveTab('guides')}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
             />
           )}
 
-          {activeTab === 'admin' && (
-            <AdminDesk 
-              verifications={verifications}
-              onApproveVerification={handleApproveVerification}
-              onRejectVerification={handleRejectVerification}
-            />
+          {activeTab === 'admin' && isAdmin && (
+            <Suspense fallback={<div className="p-10 text-center text-sm text-slate-500">Loading Admin Desk…</div>}>
+              <AdminDesk themeConfig={currentTheme} />
+            </Suspense>
           )}
         </main>
       </div>
@@ -487,6 +518,9 @@ export default function App() {
           isSaved={savedGuideIds.includes(selectedGuide.id)}
         />
       )}
+
+      {/* Ends the session after SESSION_MAX_HOURS (default 5h) */}
+      <SessionTimeoutWatcher isAuthenticated={isAuthenticated} onExpired={handleSignOut} />
 
       {/* General Auth Modal */}
       <AuthModal 

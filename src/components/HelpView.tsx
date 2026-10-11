@@ -1,22 +1,23 @@
-import { HelpCircle, BookOpen, MessageSquare, Mail, ExternalLink, ChevronRight } from 'lucide-react';
+import { HelpCircle, BookOpen, MessageSquare, Mail, ChevronRight } from 'lucide-react';
+import { SUPPORT_EMAIL } from '../lib/brand';
 
-export default function HelpView() {
+export default function HelpView({ onNavigate }: { onNavigate?: (tab: string) => void } = {}) {
   const faqs = [
     {
       q: 'How do I use the AI Diagnostic tool?',
-      a: 'Navigate to Devices, click on AI Diagnostic, and enter your device symptoms, error codes, or multimeter readings to get instant diagnostic probabilities and recommended fix steps.'
+      a: 'Open AI Diagnostic, pick your device type, describe the symptom (and any meter readings) and run the diagnosis. You get likely causes, test points and steps. It is AI-generated, so confirm readings before replacing parts.'
     },
     {
       q: 'Are the spare parts suppliers verified?',
-      a: 'Yes! Suppliers in our Marketplace undergo verification of business registration numbers, tax IDs, and official trading credentials before receiving the Verified badge.'
+      a: 'Sellers can apply for a Verified badge, which our team reviews by hand. A badge is not a guarantee, so check the listing, ask the seller questions and use a payment method with buyer protection.'
     },
     {
       q: 'Can I download guides for offline workbench use?',
-      a: 'Yes, bookmark any guide using the save button, and enable Offline Bench Mode in the header or settings to access them without an active internet connection.'
+      a: 'Save a guide with the bookmark button to keep it in your saved list on this device. Full offline access is not available yet, so keep a connection while you work.'
     },
     {
       q: 'How do I earn reputation points and badges?',
-      a: 'You earn points and certifications by completing electrical theory courses, contributing repair guides, and successfully resolving community forum questions.'
+      a: 'You earn points by logging completed repairs and passing electrical theory courses. Points are saved to your profile on this device for now.'
     }
   ];
 
@@ -34,21 +35,21 @@ export default function HelpView() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 shadow-sm space-y-3">
+        <button type="button" onClick={() => onNavigate?.('guides')} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 shadow-sm space-y-3 text-left hover:border-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors block w-full">
           <BookOpen className="w-6 h-6 text-amber-500" />
-          <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100">Documentation</h3>
-          <p className="text-xs text-stone-500">Read step-by-step soldering and multimeter manuals.</p>
-        </div>
-        <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 shadow-sm space-y-3">
+          <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100">Repair Guides</h3>
+          <p className="text-xs text-stone-500">Step-by-step repair, soldering and multimeter guides.</p>
+        </button>
+        <button type="button" onClick={() => onNavigate?.('forum')} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 shadow-sm space-y-3 text-left hover:border-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors block w-full">
           <MessageSquare className="w-6 h-6 text-amber-500" />
           <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100">Community Forum</h3>
-          <p className="text-xs text-stone-500">Ask expert technicians questions in our active forum.</p>
-        </div>
-        <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 shadow-sm space-y-3">
+          <p className="text-xs text-stone-500">Ask other repairers about a fault you're stuck on.</p>
+        </button>
+        <a href={`mailto:${SUPPORT_EMAIL}`} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 shadow-sm space-y-3 text-left hover:border-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors block w-full">
           <Mail className="w-6 h-6 text-amber-500" />
           <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100">Contact Support</h3>
-          <p className="text-xs text-stone-500">Email our engineering desk at support@diyelectronics.hub.</p>
-        </div>
+          <p className="text-xs text-stone-500 break-all">Email us at {SUPPORT_EMAIL}</p>
+        </a>
       </div>
 
       <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-8 shadow-sm space-y-6">

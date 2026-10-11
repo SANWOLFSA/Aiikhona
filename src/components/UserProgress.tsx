@@ -1,18 +1,21 @@
 import { Award, Zap, Trash2, Heart, ShieldAlert, GraduationCap, Flame } from 'lucide-react';
 import type { UserProfile, Guide } from '../types';
+import { MyVideosPanel } from './catalog/CommunityVideos';
 
 export default function UserProgress({ 
   currentUser, 
   savedGuides, 
   onOpenGuide, 
   onRemoveSavedGuide, 
-  onNavigateToGuides 
+  onNavigateToGuides,
+  onOpenAuth,
 }: { 
   currentUser: UserProfile; 
   savedGuides: Guide[]; 
   onOpenGuide: (g: Guide) => void; 
   onRemoveSavedGuide: (g: Guide) => void; 
   onNavigateToGuides: () => void; 
+  onOpenAuth?: () => void;
 }) {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -141,6 +144,8 @@ export default function UserProgress({
           </div>
         </div>
       </div>
+
+      <MyVideosPanel onOpenAuth={onOpenAuth} />
     </div>
   );
 }

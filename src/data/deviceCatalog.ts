@@ -1,5 +1,3 @@
-import { DeviceCategory } from '../types';
-
 export interface DeviceSize {
   id: string;
   name: string;
@@ -7,7 +5,7 @@ export interface DeviceSize {
   diagnosticSteps: string[];
   requiredTools: string[];
   commonParts: string[];
-  repairSummary: string;
+  repairSummary: string | string[];
 }
 
 export interface DeviceBrand {

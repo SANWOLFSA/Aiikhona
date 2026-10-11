@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Leaf, Search, BookmarkCheck, Bookmark, Clock, Eye, ThumbsUp, Wrench, BookOpen } from 'lucide-react';
 import ProTipsSidebar from './ProTipsSidebar';
-import DeviceDirectoryView from './DeviceDirectoryView';
+import DeviceDirectoryView from './catalog/LazyDeviceDirectory';
 import { useBenchSpeech, speakBenchText } from '../hooks/useBenchSpeech';
 import HandsFreeBenchHUD from './HandsFreeBenchHUD';
 import type { Guide } from '../types';
@@ -209,6 +209,7 @@ export default function RepairGuides({
           savedGuideIds={savedGuideIds}
           onToggleSaveGuide={onToggleSaveGuide}
           onSourcePart={onSourcePart}
+          basePath="/guides/devices"
         />
       ) : (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -291,10 +292,14 @@ export default function RepairGuides({
                       </div>
 
                       <div className="p-5 pt-0 flex items-center justify-between text-[11px] text-stone-400 font-mono">
-                        <span>By: {g.author.name.split(' ')[0]}</span>
+                        <span>By: {g.author?.name || 'DIY Electronics'}</span>
                         <div className="flex items-center gap-3">
-                          <span className="flex items-center gap-1"><Eye className="w-3.5 h-3.5" /> {g.views.toLocaleString()}</span>
-                          <span className="flex items-center gap-1"><ThumbsUp className="w-3.5 h-3.5" /> {g.likes.toLocaleString()}</span>
+                          {typeof g.views === 'number' && g.views > 0 && (
+                            <span className="flex items-center gap-1"><Eye className="w-3.5 h-3.5" /> {g.views.toLocaleString()}</span>
+                          )}
+                          {typeof g.likes === 'number' && g.likes > 0 && (
+                            <span className="flex items-center gap-1"><ThumbsUp className="w-3.5 h-3.5" /> {g.likes.toLocaleString()}</span>
+                          )}
                         </div>
                       </div>
                     </div>

@@ -6,7 +6,9 @@ export interface UserProfile {
   authProvider: string;
   avatar: string;
   role: string;
+  uid?: string;
   isVerifiedTrader?: boolean;
+  isVerifiedCompany?: boolean;
   reputationPoints: number;
   experiencePoints?: number;
   repairsCompleted: number;

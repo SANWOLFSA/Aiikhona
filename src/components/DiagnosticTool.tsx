@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Activity, Sparkles, ShieldAlert, Wrench, Copy, ArrowRight, Volume2 } from 'lucide-react';
+import { Activity, Sparkles, ShieldAlert, Wrench, Copy, ArrowRight, Volume2, AlertTriangle } from 'lucide-react';
 import { useBenchSpeech, playBenchBeep, speakBenchText } from '../hooks/useBenchSpeech';
 import HandsFreeBenchHUD from './HandsFreeBenchHUD';
 
@@ -59,111 +59,86 @@ const CATEGORIES = [
 
 const BRANDS = ["Apple", "Sony", "Nintendo", "Samsung", "Dell", "Microsoft", "Lenovo", "Asus", "DJI", "LG"];
 
-export default function DiagnosticTool({ onSourcePart, onOpenGuide: _onOpenGuide }: { onSourcePart: (p: string) => void; onOpenGuide: (id: string) => void }) {
+interface DiagnosisStep { stepNumber: number; title: string; detail: string }
+interface DiagnosisResult {
+  probableCause: string;
+  otherPossibleCauses: string[];
+  severity: 'Low' | 'Medium' | 'High' | 'Critical';
+  safetyWarning: string;
+  requiredTools: string[];
+  testPoints: string[];
+  steps: DiagnosisStep[];
+  partToSource: string;
+  whenToStop: string;
+}
+
+export default function DiagnosticTool({ onSourcePart }: { onSourcePart: (p: string) => void; onOpenGuide?: (id: string) => void }) {
   const [category, setCategory] = useState("Gaming Consoles");
-  const [model, setModel] = useState("Nintendo Switch (HAC-001)");
-  const [symptom, setSymptom] = useState("Draws 0.00A at 15V / No battery charge");
-  const [powerStatus, setPowerStatus] = useState("No power drawn (0.00A on meter)");
-  const [visualSigns, _setVisualSigns] = useState("No visible scorch marks, battery at 3.2V");
+  const [model, setModel] = useState("");
+  const [symptom, setSymptom] = useState("");
+  const [powerStatus, setPowerStatus] = useState("");
+  const [visualSigns, setVisualSigns] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<DiagnosisResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   // Auto-fill first preset when category changes
+  // When the category changes, only replace the symptom if it was empty or one of the canned presets
   useEffect(() => {
     const list = PRESETS[category] || [];
-    if (list[0]) {
-      setSymptom(list[0]);
-    }
+    setSymptom(prev => {
+      const isPreset = !prev.trim() || Object.values(PRESETS).some(arr => arr.includes(prev));
+      return isPreset ? (list[0] || '') : prev;
+    });
   }, [category]);
 
   const handleDiagnose = useCallback(async () => {
-    if (!symptom) return;
+    if (!symptom.trim() || loading) return;
     setLoading(true);
     setResult(null);
+    setError(null);
     playBenchBeep('step');
-
-    // Simulate high-fidelity diagnostic reasoning
-    setTimeout(() => {
-      let probableCause = `Power delivery management breakdown in ${model}`;
-      const requiredTools = ["Digital Multimeter (Diode Mode)", "Hot Air Station (350°C)", "Tacky Flux (Amtech NC-559)", "0402 Solder Wick"];
-      let testPoints = [
-        "VBUS 5V/15V rail: Measure across input filter capacitor for continuity short to ground.",
-        "M92T36 Pin 5 / 6 bypass capacitor: Diode mode reading should be 0.45V - 0.52V. Under 0.05V indicates internal IC punch-through.",
-        "3V3 standby rail: Check resistance to chassis ground. Anything under 100 ohms indicates defective PMIC."
-      ];
-      let steps = [
-        { stepNumber: 1, title: "Isolate & Check Standby Rails", detail: "Disconnect battery. Measure main bypass capacitors around the power management IC in Diode mode with RED probe on ground." },
-        { stepNumber: 2, title: "Thermal Tracing / Freeze Spray", detail: "If a rail is shorted, inject 1.2V 1A into the rail using a bench power supply to verify if the chip glows hot." },
-        { stepNumber: 3, title: "Hot Air IC Replacement", detail: "Shield adjacent plastic connectors with Kapton tape, apply tacky flux, reflow at 340°C, clean pads, and install fresh replacement." }
-      ];
-      const estimatedCost = "$4.50 for replacement IC";
-      const repairabilityScore = "9/10 (Standard bench fix)";
-
-      // Handle custom outputs based on selections for ultimate realism!
-      if (model.toLowerCase().includes("switch")) {
-        probableCause = "M92T36 Power Management IC Short to Ground";
-        testPoints = [
-          "Check Pin 5 (VCONN) capacitor for low resistance to ground. Normal is ~0.5V diode drop.",
-          "Check Pin 6 (VBUS) protection diode. Normal is 0.45V, short is 0.01V.",
-          "PP3V3_G3H Standby Rail check at inductor: Expected 3.3V, if 0V look at MAX77620."
-        ];
-        steps = [
-          { stepNumber: 1, title: "Battery Isolation", detail: "Safely disconnect the internal lithium polymer battery using non-metallic plastic levers." },
-          { stepNumber: 2, title: "Probing M92T36 Capacitors", detail: "Put multimeter in Diode mode, place RED probe on any metal copper shield, and touch BLACK probe to the capacitors above M92." },
-          { stepNumber: 3, title: "Replacement & Test", detail: "Reflow the chip with hot air at 340°C. Do not exceed 360°C to avoid board delamination." }
-        ];
-      } else if (category === "Laptops & PCs") {
-        probableCause = "USB-PD Negotiation Chip (CD3215 or similar) Communication Fault";
-        testPoints = [
-          "Measure PPBUS_G3H voltage. If stuck at 12.3V, T2 chip or PMIC is not starting.",
-          "Probing CD3215 local LDOs (PP3V3_UPC and PP1V1_UPC). Each CD3215 must output both LDOs to negotiate 20V.",
-          "SMC_RESET_L rail level: expected 3.4V. If low, keyboard or supervisor chip is pulling it down."
-        ];
-        steps = [
-          { stepNumber: 1, title: "Ammeter Assessment", detail: "Test all USB-C ports. Look for the single port that reads 5V 0.00A instead of 5V 0.02A." },
-          { stepNumber: 2, title: "LDO Rail Diode Checks", detail: "Confirm if LDO rails are shorted. A short on the 1.1V LDO indicates CD3215 internal silicon breakdown." },
-          { stepNumber: 3, title: "Clean and Reflow BGA", detail: "Apply flux, pre-heat motherboard, and desolder BGA chip carefully." }
-        ];
-      } else if (category === "Smartphones") {
-        probableCause = "Sub-board USB Daughterboard Corrosion or Flex Tear";
-        testPoints = [
-          "Measure USB VBUS line continuity at the mainboard connector. Expected 5V/9V.",
-          "Check thermistor resistance pin. A corroded thermistor causes the 'moisture detected' fake lock.",
-          "Verify LCD backlight anode line (PP_LCM_BL_ANODE). Expected 18V-24V under load."
-        ];
-      }
-
-      setResult({
-        probableCause,
-        severity: "High",
-        confidenceScore: 91,
-        safetyWarning: "Unplug power supply and disconnect lithium battery before probing SMD rails to prevent logic board shorting.",
-        requiredTools,
-        testPoints,
-        steps,
-        estimatedCost,
-        repairabilityScore
+    try {
+      const response = await fetch('/api/diagnose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category, model, symptom, powerStatus, visualSigns }),
       });
-      setLoading(false);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.diagnosis) {
+        throw new Error(data?.error || (response.status === 503
+          ? 'The AI diagnostic service is unavailable right now. Please try again in a moment.'
+          : 'Could not get a diagnosis. Please try again.'));
+      }
+      setResult(data.diagnosis as DiagnosisResult);
       playBenchBeep('pass');
-    }, 1200);
-  }, [category, model, symptom]);
+    } catch (err: any) {
+      const msg = err instanceof TypeError
+        ? 'Network error: could not reach the diagnostic service. Check your connection and try again.'
+        : (err?.message || 'Could not get a diagnosis. Please try again.');
+      setError(msg);
+      playBenchBeep('fail');
+    } finally {
+      setLoading(false);
+    }
+  }, [category, model, symptom, powerStatus, visualSigns, loading]);
 
   const handleCopyReport = useCallback(() => {
     if (!result) return;
-    const reportText = `DIYELECTRONICS DIAGNOSTIC REPORT
+    const reportText = `DIY ELECTRONICS DIAGNOSTIC REPORT
 Device Model: ${model}
 Symptom: ${symptom}
 Probable Cause: ${result.probableCause}
 Safety Warning: ${result.safetyWarning}
 Test Points:
 ${result.testPoints.map((tp: string, idx: number) => ` ${idx + 1}. ${tp}`).join('\n')}
-Estimated Component Cost: ${result.estimatedCost}`;
+${result.partToSource ? `Part to source: ${result.partToSource}\n` : ''}${result.whenToStop ? `When to stop: ${result.whenToStop}\n` : ''}Generated by AI. Verify measurements against the device's schematic before replacing parts.`;
 
-    navigator.clipboard.writeText(reportText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    navigator.clipboard?.writeText(reportText).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => setError('Could not copy to the clipboard in this browser.'));
   }, [model, result, symptom]);
 
   // Voice Commands Configuration for Diagnostic Tool
@@ -228,7 +203,7 @@ Estimated Component Cost: ${result.estimatedCost}`;
       description: 'Read Full Diagnostic Results',
       action: () => {
         if (result) {
-          const text = `Diagnostic result for ${model}: Probable cause is ${result.probableCause}. Severity is ${result.severity}. Safety mandate: ${result.safetyWarning}. First test point: ${result.testPoints?.[0] || 'See screen'}. Estimated cost: ${result.estimatedCost}`;
+          const text = `Diagnostic result for ${model}: Probable cause is ${result.probableCause}. Severity is ${result.severity}. Safety mandate: ${result.safetyWarning}. First test point: ${result.testPoints?.[0] || 'See screen'}.`;
           speakBenchText(text);
         } else {
           speakBenchText("No diagnostic report generated yet. Say 'run diagnosis' to start.");
@@ -282,8 +257,12 @@ Estimated Component Cost: ${result.estimatedCost}`;
       keywords: ['source parts', 'buy part', 'find part'],
       description: 'Source Replacement Component',
       action: () => {
-        onSourcePart(model.includes("Switch") ? "M92T36" : "IC Chip");
-        speakBenchText("Navigating to parts sourcing marketplace.");
+        if (result?.partToSource) {
+          onSourcePart(result.partToSource);
+          speakBenchText("Opening spare parts search.");
+        } else {
+          speakBenchText("No specific part identified yet. Run a diagnosis first.");
+        }
       }
     }
   ], [handleDiagnose, handleCopyReport, model, onSourcePart, result]);
@@ -306,7 +285,7 @@ Estimated Component Cost: ${result.estimatedCost}`;
   // Auto-announce diagnostic result when complete if voice enabled
   useEffect(() => {
     if (result && isListening && isTtsEnabled) {
-      speakText(`Diagnosis complete. Probable cause: ${result.probableCause}. Confidence: ${result.confidenceScore} percent.`);
+      speakText(`Diagnosis complete. Probable cause: ${result.probableCause}. Severity: ${result.severity}.`);
     }
   }, [result, isListening, isTtsEnabled, speakText]);
 
@@ -317,7 +296,7 @@ Estimated Component Cost: ${result.estimatedCost}`;
     { phrase: 'read test points', action: 'Speak multimeter probe checks out loud' },
     { phrase: 'read steps', action: 'Speak step-by-step resolution walk' },
     { phrase: 'copy report', action: 'Copy diagnostic report to clipboard' },
-    { phrase: 'source parts', action: 'Jump to verified replacement IC sourcing' }
+    { phrase: 'source parts', action: 'Search spare parts for the suggested component' }
   ];
 
   return (
@@ -344,11 +323,11 @@ Estimated Component Cost: ${result.estimatedCost}`;
         <div className="max-w-3xl space-y-3 relative z-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/20 border border-amber-400/30 text-amber-300 text-xs font-bold tracking-wide uppercase">
             <Sparkles className="w-3.5 h-3.5 animate-pulse text-amber-400" />
-            <span>AI Diagnostic Engine (Active Bench Assistant)</span>
+            <span>AI Diagnostic Assistant</span>
           </div>
           <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white">AI-Powered Device Symptom Diagnostic Tool</h1>
           <p className="text-stone-300 text-sm sm:text-base leading-relaxed">
-            Stuck on a repair bench? Select your consumer electronic device, describe what it's doing (or not doing), and receive an instant component-level diagnostic tree with exact multimeter test points and safety warnings.
+            Stuck on a repair bench? Select your consumer electronic device, describe what it's doing (or not doing), and get likely causes, multimeter test points, and safety warnings from AI. Always confirm readings against the device's schematic.
           </p>
         </div>
       </div>
@@ -357,13 +336,13 @@ Estimated Component Cost: ${result.estimatedCost}`;
         <div className="lg:col-span-5 bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-6 shadow-sm space-y-5">
           <div className="flex items-center gap-2 font-bold text-stone-900 dark:text-stone-100 text-base pb-3 border-b border-stone-100 dark:border-stone-800">
             <Activity className="w-5 h-5 text-amber-500" />
-            <span>Device Symptoms & Telemetry</span>
+            <span>Device & Symptoms</span>
           </div>
           
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1.5 uppercase tracking-wider">1. Device Category</label>
-              <select 
+              <label htmlFor="diag-category" className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1.5 uppercase tracking-wider">1. Device Category</label>
+              <select id="diag-category"
                 value={category} 
                 onChange={e => setCategory(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 font-medium"
@@ -374,8 +353,8 @@ Estimated Component Cost: ${result.estimatedCost}`;
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider">2. Brand & Model</label>
-                <span className="text-[10px] text-stone-500 font-medium">Select quick preset</span>
+                <label htmlFor="diag-model" className="text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider">2. Brand & Model</label>
+                <span className="text-[10px] text-stone-500 font-medium">Tap a brand to start</span>
               </div>
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 mb-2">
                 {BRANDS.map(brand => (
@@ -383,7 +362,7 @@ Estimated Component Cost: ${result.estimatedCost}`;
                     key={brand}
                     type="button" 
                     onClick={() => {
-                      setModel(`${brand} Switch OLED`);
+                      setModel(`${brand} `);
                     }}
                     className="text-[11px] px-2.5 py-1 rounded-lg border bg-stone-50 dark:bg-stone-800 border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:border-amber-400 whitespace-nowrap font-medium transition-all"
                   >
@@ -392,6 +371,7 @@ Estimated Component Cost: ${result.estimatedCost}`;
                 ))}
               </div>
               <input 
+                id="diag-model"
                 type="text" 
                 value={model} 
                 onChange={e => setModel(e.target.value)}
@@ -401,7 +381,7 @@ Estimated Component Cost: ${result.estimatedCost}`;
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1.5 uppercase tracking-wider">Quick Symptom Presets</label>
+              <label htmlFor="diag-symptom" className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1.5 uppercase tracking-wider">Symptoms <span className="normal-case font-medium text-stone-500">(pick a common one or describe your own)</span></label>
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {(PRESETS[category] || []).map((p, idx) => (
                   <button 
@@ -415,6 +395,7 @@ Estimated Component Cost: ${result.estimatedCost}`;
                 ))}
               </div>
               <textarea 
+                id="diag-symptom"
                 rows={3} 
                 value={symptom} 
                 onChange={e => setSymptom(e.target.value)}
@@ -424,12 +405,13 @@ Estimated Component Cost: ${result.estimatedCost}`;
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1.5 uppercase tracking-wider">3. Current Draw & Power Supply Response</label>
-              <select 
+              <label htmlFor="diag-power" className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1.5 uppercase tracking-wider">3. Current Draw & Power Supply Response</label>
+              <select id="diag-power"
                 value={powerStatus} 
                 onChange={e => setPowerStatus(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
               >
+                <option value="">Not measured / don't know</option>
                 <option value="No power drawn (0.00A on meter)">0.00A (Completely Open Circuit / Blown Input Fuse)</option>
                 <option value="Stuck at low current (5V 0.02A - 0.05A)">5V 0.02A - 0.04A (Missing Power Delivery Negotiation)</option>
                 <option value="Direct short (Bench supply trips CC current limit)">Dead Short (Over-current trip / Rail short to ground)</option>
@@ -438,15 +420,28 @@ Estimated Component Cost: ${result.estimatedCost}`;
               </select>
             </div>
 
+            <div>
+              <label htmlFor="diag-visual" className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1.5 uppercase tracking-wider">4. Visual Signs <span className="normal-case font-medium text-stone-500">(optional)</span></label>
+              <input
+                id="diag-visual"
+                type="text"
+                value={visualSigns}
+                onChange={e => setVisualSigns(e.target.value)}
+                placeholder="e.g. scorch mark near charge port, swollen battery, corrosion"
+                className="w-full px-3 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+            </div>
+
             <button 
               onClick={handleDiagnose} 
-              disabled={loading || !symptom}
+              type="button"
+              disabled={loading || !symptom.trim()}
               className="w-full py-3.5 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-stone-950 font-black text-sm flex items-center justify-center gap-2 transition-all shadow-md active:scale-98 disabled:opacity-50"
             >
               {loading ? (
                 <>
                   <div className="w-4 h-4 border-2 border-stone-950 border-t-transparent rounded-full animate-spin" />
-                  <span>Analyzing Schematics & Multimeter Checks...</span>
+                  <span>Diagnosing…</span>
                 </>
               ) : (
                 <>
@@ -459,12 +454,26 @@ Estimated Component Cost: ${result.estimatedCost}`;
         </div>
 
         <div className="lg:col-span-7">
-          {result ? (
+          {error && !loading && (
+            <div role="alert" className="mb-4 p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+              <div className="flex-1 space-y-2">
+                <p className="text-sm text-red-800 dark:text-red-300">{error}</p>
+                <button type="button" onClick={handleDiagnose} className="text-xs font-bold text-red-700 dark:text-red-300 underline">Try again</button>
+              </div>
+            </div>
+          )}
+          {loading ? (
+            <div aria-live="polite" className="h-full min-h-[420px] rounded-2xl border border-stone-200 dark:border-stone-800 flex flex-col items-center justify-center p-8 text-center space-y-3">
+              <div className="w-10 h-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-stone-600 dark:text-stone-400">Working out likely causes and test points…</p>
+            </div>
+          ) : result ? (
             <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-6 shadow-sm space-y-6">
               <div className="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-stone-200 dark:border-stone-800">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-xs font-bold">Confidence: {result.confidenceScore}%</span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 text-xs font-bold">AI-generated</span>
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${result.severity === "Critical" || result.severity === "High" ? "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300" : "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300"}`}>Severity: {result.severity}</span>
                   </div>
                   <h3 className="text-xl font-black text-stone-900 dark:text-stone-100 mt-2">{result.probableCause}</h3>
@@ -498,7 +507,7 @@ Estimated Component Cost: ${result.estimatedCost}`;
                 <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800/60 flex items-start gap-3">
                   <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="text-xs font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider">Technician Safety Mandate</h4>
+                    <h4 className="text-xs font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider">Safety First</h4>
                     <p className="text-xs text-amber-800 dark:text-amber-400 mt-0.5 leading-relaxed">{result.safetyWarning}</p>
                   </div>
                 </div>
@@ -511,7 +520,7 @@ Estimated Component Cost: ${result.estimatedCost}`;
                       <Wrench className="w-4 h-4 text-amber-500" />
                       <span>Multimeter Probing Checkpoints</span>
                     </h4>
-                    <span className="text-[11px] text-stone-500">Bench testing values</span>
+                    <span className="text-[11px] text-stone-500">Typical values; confirm with the schematic</span>
                   </div>
                   <div className="space-y-2">
                     {result.testPoints.map((tp: string, idx: number) => (
@@ -541,20 +550,44 @@ Estimated Component Cost: ${result.estimatedCost}`;
                 </div>
               )}
 
-              <div className="pt-4 border-t border-stone-200 dark:border-stone-800 flex flex-wrap items-center justify-between gap-4 text-xs">
-                <div>
-                  <span className="text-stone-500">Estimated Component Cost: </span>
-                  <span className="font-bold text-emerald-600 dark:text-emerald-400">{result.estimatedCost || "$3.00 - $12.00"}</span>
+              {result.otherPossibleCauses.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-stone-700 dark:text-stone-300">Other Possible Causes</h4>
+                  <ul className="list-disc pl-5 space-y-1 text-xs text-stone-600 dark:text-stone-400">
+                    {result.otherPossibleCauses.map((c, idx) => <li key={idx}>{c}</li>)}
+                  </ul>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={() => onSourcePart(model.includes("Switch") ? "M92T36" : "IC Chip")}
+              )}
+
+              {result.requiredTools.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-stone-700 dark:text-stone-300">Tools You'll Need</h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {result.requiredTools.map((t, idx) => (
+                      <span key={idx} className="text-[11px] px-2.5 py-1 rounded-lg bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300">{t}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {result.whenToStop && (
+                <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 text-xs text-red-800 dark:text-red-300">
+                  <span className="font-bold">When to stop: </span>{result.whenToStop}
+                </div>
+              )}
+
+              <div className="pt-4 border-t border-stone-200 dark:border-stone-800 flex flex-wrap items-center justify-between gap-4 text-xs">
+                <p className="text-stone-500 max-w-sm">AI-generated guidance. Check readings against the device's schematic before replacing parts.</p>
+                {result.partToSource && (
+                  <button
+                    type="button"
+                    onClick={() => onSourcePart(result.partToSource)}
                     className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold transition-all shadow-xs flex items-center gap-1.5"
                   >
-                    <span>Source Compatible Parts</span>
+                    <span>Find "{result.partToSource}" in Spare Parts</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
-                </div>
+                )}
               </div>
             </div>
           ) : (
@@ -565,13 +598,13 @@ Estimated Component Cost: ${result.estimatedCost}`;
               <div className="max-w-md space-y-1">
                 <h3 className="text-base font-bold text-stone-900 dark:text-stone-100">Ready to Diagnose Your Electronic Fault</h3>
                 <p className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
-                  Select your device category on the left, pick or describe your symptoms, and click "Generate Diagnostic Tree". The AI engine will provide actionable test points.
+                  Select your device category on the left, pick or describe your symptoms, and click "Generate Diagnostic Tree". You'll get likely causes and test points to check.
                 </p>
               </div>
               <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
                 <span className="text-[11px] px-2.5 py-1 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 font-medium">✓ Multimeter Test Guidance</span>
                 <span className="text-[11px] px-2.5 py-1 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 font-medium">✓ Safety Voltage Warnings</span>
-                <span className="text-[11px] px-2.5 py-1 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 font-medium">✓ Spare Parts Cross-Reference</span>
+                <span className="text-[11px] px-2.5 py-1 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 font-medium">✓ Parts to Look For</span>
               </div>
             </div>
           )}

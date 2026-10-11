@@ -5,6 +5,8 @@ import {
   createUserWithEmailAndPassword, 
   signOut,
   onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence,
   User as FirebaseUser
 } from 'firebase/auth';
 import { 
@@ -22,19 +24,58 @@ import {
   orderBy
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+const env = import.meta.env;
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID
+  apiKey: env.VITE_FIREBASE_API_KEY,
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: env.VITE_FIREBASE_APP_ID,
+  firestoreDatabaseId: env.VITE_FIREBASE_DATABASE_ID
 };
 
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+/** True when the required VITE_FIREBASE_* env vars are present. */
+export const isFirebaseConfigured = Boolean(
+  firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId
+);
+
+if (!isFirebaseConfigured) {
+  console.warn(
+    '[firebase] VITE_FIREBASE_API_KEY / VITE_FIREBASE_PROJECT_ID / VITE_FIREBASE_APP_ID are not set. ' +
+    'The app will run, but sign-in, Firestore and Storage features are disabled. ' +
+    'Copy .env.example to .env and fill in your Firebase web config.'
+  );
+}
+
+// When config is missing, initialise with harmless placeholder values so that
+// getAuth/getFirestore/getStorage don't throw at import time and crash the whole
+// app. Any actual Firebase call will then fail and be handled by the caller.
+const effectiveConfig = isFirebaseConfigured
+  ? firebaseConfig
+  : {
+      apiKey: 'missing-firebase-api-key',
+      authDomain: 'demo-diyelectronics.firebaseapp.com',
+      projectId: 'demo-diyelectronics',
+      storageBucket: 'demo-diyelectronics.appspot.com',
+      messagingSenderId: '0',
+      appId: '1:0:web:0',
+      firestoreDatabaseId: undefined as string | undefined
+    };
+
+const app = initializeApp(effectiveConfig);
+export const db = effectiveConfig.firestoreDatabaseId
+  ? getFirestore(app, effectiveConfig.firestoreDatabaseId)
+  : getFirestore(app);
 export const auth = getAuth(app);
+// Keep users signed in across reloads/tabs; the 5-hour session limit is enforced by
+// src/lib/useSessionTimeout.ts on top of this.
+if (isFirebaseConfigured) {
+  setPersistence(auth, browserLocalPersistence).catch(err =>
+    console.warn('[firebase] Could not set local auth persistence.', err)
+  );
+}
 export const storage = getStorage(app);
 export { collection, addDoc, serverTimestamp, query, getDocs, onSnapshot, orderBy };
 

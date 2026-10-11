@@ -1,4 +1,4 @@
-import { Home, Smartphone, BookOpen, ShoppingBag, MessageSquare, Bot, Settings, Info, HelpCircle, Wrench, ShieldCheck, FileText } from 'lucide-react';
+import { GraduationCap, Home, Smartphone, BookOpen, ShoppingBag, MessageSquare, Bot, Settings, Info, HelpCircle, Wrench, ShieldCheck, FileText, Search, Microchip, ScanSearch, Award } from 'lucide-react';
 import type { UserProfile } from '../types';
 import type { ThemeConfig } from '../lib/theme';
 
@@ -8,16 +8,25 @@ interface SidebarProps {
   isOpen: boolean;
   onCloseMobile: () => void;
   currentUser: UserProfile;
+  /** From useAdminStatus().isAdmin; never decided by email here. */
+  isAdmin?: boolean;
   pendingVerificationsCount?: number;
   themeConfig?: ThemeConfig;
 }
 
-export default function Sidebar({ activeTab, onSelectTab, isOpen, onCloseMobile, currentUser, pendingVerificationsCount, themeConfig }: SidebarProps) {
+export default function Sidebar({ activeTab, onSelectTab, isOpen, onCloseMobile, isAdmin = false, pendingVerificationsCount, themeConfig }: SidebarProps) {
   const menuItems: any[] = [
     { id: 'home', label: 'Home Feed', icon: Home, description: 'Community forum posts & updates', highlight: true },
     { id: 'phones', label: 'Phones Page', icon: Smartphone, description: 'AI troubleshooting & tricks', highlight: true },
     { id: 'blueprint_viewer', label: 'Boardview & Blueprints', icon: FileText, description: 'Realistic boardviews, OEM schematics & blueprints', highlight: true },
+    { id: 'search', label: 'Search everything', icon: Search, description: 'Any device, part number, guide or answer', highlight: true },
     { id: 'devices', label: 'Devices', icon: Smartphone, description: 'Repair guides & diagnostics' },
+    { id: 'guides', label: 'Repair guides', icon: BookOpen, description: 'Step-by-step community guides' },
+    { id: 'answers', label: 'Answers', icon: HelpCircle, description: 'Q&A for every device' },
+    { id: 'teardowns', label: 'Teardowns', icon: ScanSearch, description: 'See inside devices' },
+    { id: 'components', label: 'Components', icon: Microchip, description: 'Specs, pinouts, datasheets, equivalents' },
+    { id: 'contributors', label: 'Top fixers', icon: Award, description: 'Reputation & badges' },
+    { id: 'theory', label: 'Electrical Theory', icon: GraduationCap, description: 'Theory A–Z & Exam Room', highlight: true },
     { id: 'learning', label: 'Learning', icon: BookOpen, description: 'Electrical courses & exams' },
     { id: 'marketplace', label: 'Market place', icon: ShoppingBag, description: 'Verified parts & tools' },
     { id: 'forum', label: 'Community forum', icon: MessageSquare, description: 'Tech discussions & help' },
@@ -28,7 +37,7 @@ export default function Sidebar({ activeTab, onSelectTab, isOpen, onCloseMobile,
   ];
 
   // Admin Desk is restricted exclusively to admins
-  if (currentUser?.email === 'sbheko1@gmail.com' || currentUser?.email === 'diy.electronicsa@gmail.com') {
+  if (isAdmin) {
     menuItems.push({
       id: 'admin',
       label: 'Admin Desk',
@@ -52,7 +61,7 @@ export default function Sidebar({ activeTab, onSelectTab, isOpen, onCloseMobile,
         {/* Sidebar Header / Logo area */}
         <div className="p-5 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-lg ${themeConfig?.primaryBg || 'bg-blue-600'} text-white flex items-center justify-center font-bold shadow-xs`}>
+            <div className={`w-9 h-9 rounded-xl ${themeConfig?.primaryBg || 'bg-indigo-600'} text-white flex items-center justify-center font-bold shadow-xs`}>
               <Wrench className="w-4.5 h-4.5 text-white" />
             </div>
             <div>
@@ -82,15 +91,15 @@ export default function Sidebar({ activeTab, onSelectTab, isOpen, onCloseMobile,
                   onSelectTab(item.id);
                   onCloseMobile();
                 }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all group relative text-left ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all group relative text-left ${
                   isActive 
-                    ? (themeConfig?.activeNavBg || 'bg-blue-600 text-white shadow-sm') 
+                    ? (themeConfig?.activeNavBg || 'bg-indigo-600 text-white shadow-sm') 
                     : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/70 hover:text-slate-950 dark:hover:text-white'
                 }`}
               >
                 <div className={`w-8 h-8 rounded-md flex items-center justify-center transition-colors shrink-0 ${
                   isActive 
-                    ? (themeConfig?.activeNavIconBg || 'bg-blue-800 text-white') 
+                    ? (themeConfig?.activeNavIconBg || 'bg-indigo-800 text-white') 
                     : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 group-hover:bg-slate-200 dark:group-hover:bg-slate-700'
                 }`}>
                   <Icon className="w-4 h-4" />
@@ -103,7 +112,7 @@ export default function Sidebar({ activeTab, onSelectTab, isOpen, onCloseMobile,
                         <span className="px-1.5 py-0.5 rounded bg-red-600 text-white text-[10px] font-bold">{item.badge}</span>
                       )}
                       {item.highlight && !isActive && (
-                        <span className={`w-1.5 h-1.5 rounded-full ${themeConfig?.indicatorBg || 'bg-blue-500'}`}></span>
+                        <span className={`w-1.5 h-1.5 rounded-full ${themeConfig?.indicatorBg || 'bg-indigo-500'}`}></span>
                       )}
                     </div>
                   </div>
@@ -119,7 +128,7 @@ export default function Sidebar({ activeTab, onSelectTab, isOpen, onCloseMobile,
         {/* Sidebar Footer / Eco Impact Widget */}
         <div className="p-3.5 border border-slate-200/80 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-900/60 m-3.5 rounded-xl">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
               🌿
             </div>
             <div className="flex-1 min-w-0">

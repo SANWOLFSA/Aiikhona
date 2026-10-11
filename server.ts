@@ -1,23 +1,117 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
+import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 import { initialParts, initialGuides } from './src/data';
 
-const app = express();
+export const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+// Explicit body limit (base64 audio for /api/transcribe-audio needs more than the 100kb default).
+app.use(express.json({ limit: '6mb' }));
+
+// ---- Basic abuse protection ----------------------------------------------------
+// Simple in-memory per-IP rate limit for every POST (all AI routes are POSTs).
+// On Netlify each function instance keeps its own counters, so this is a best-effort
+// guard against scripted abuse rather than a hard global quota.
+const RATE_WINDOW_MS = 5 * 60 * 1000;
+const RATE_MAX_REQUESTS = Number(process.env.API_RATE_LIMIT_PER_5MIN) || 30;
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function getClientIp(req: express.Request): string {
+  const forwarded = req.headers['x-nf-client-connection-ip'] || req.headers['x-forwarded-for'];
+  const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  return (raw ? String(raw).split(',')[0].trim() : '') || req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
+app.use((req, res, next) => {
+  if (req.method !== 'POST') return next();
+  const now = Date.now();
+  const ip = getClientIp(req);
+  let bucket = rateBuckets.get(ip);
+  if (!bucket || bucket.resetAt <= now) {
+    bucket = { count: 0, resetAt: now + RATE_WINDOW_MS };
+    rateBuckets.set(ip, bucket);
+  }
+  bucket.count += 1;
+  if (rateBuckets.size > 10000) {
+    for (const [key, b] of rateBuckets) if (b.resetAt <= now) rateBuckets.delete(key);
+  }
+  if (bucket.count > RATE_MAX_REQUESTS) {
+    res.setHeader('Retry-After', String(Math.ceil((bucket.resetAt - now) / 1000)));
+    return res.status(429).json({ error: 'Too many requests. Please wait a few minutes and try again.' });
+  }
+  next();
+});
+
+// ---- Firebase ID token verification (no firebase-admin dependency) --------------
+// Verifies the RS256 signature against Google's public securetoken certificates and
+// checks aud/iss/exp, as documented for third-party JWT libraries:
+// https://firebase.google.com/docs/auth/admin/verify-id-tokens#verify_id_tokens_using_a_third-party_jwt_library
+const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || 'diy-electronic';
+const SECURETOKEN_CERTS_URL = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
+let certCache: { certs: Record<string, string>; expiresAt: number } | null = null;
+
+async function getSecureTokenCerts(): Promise<Record<string, string>> {
+  if (certCache && certCache.expiresAt > Date.now()) return certCache.certs;
+  const resp = await fetch(SECURETOKEN_CERTS_URL);
+  if (!resp.ok) throw new Error(`cert fetch failed: ${resp.status}`);
+  const certs = (await resp.json()) as Record<string, string>;
+  const maxAge = Number(/max-age=(\d+)/.exec(resp.headers.get('cache-control') || '')?.[1] || 3600);
+  certCache = { certs, expiresAt: Date.now() + maxAge * 1000 };
+  return certs;
+}
+
+async function verifyFirebaseIdToken(token: string): Promise<{ uid: string } | null> {
+  try {
+    const [h, p, sig] = token.split('.');
+    if (!h || !p || !sig) return null;
+    const header = JSON.parse(Buffer.from(h, 'base64url').toString('utf8'));
+    const payload = JSON.parse(Buffer.from(p, 'base64url').toString('utf8'));
+    if (header.alg !== 'RS256' || !header.kid) return null;
+    const certs = await getSecureTokenCerts();
+    const cert = certs[header.kid];
+    if (!cert) return null;
+    const verifier = crypto.createVerify('RSA-SHA256');
+    verifier.update(`${h}.${p}`);
+    if (!verifier.verify(cert, Buffer.from(sig, 'base64url'))) return null;
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (payload.aud !== FIREBASE_PROJECT_ID) return null;
+    if (payload.iss !== `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`) return null;
+    if (typeof payload.exp !== 'number' || payload.exp <= nowSec) return null;
+    if (typeof payload.iat !== 'number' || payload.iat > nowSec + 300) return null;
+    if (typeof payload.sub !== 'string' || !payload.sub) return null;
+    return { uid: payload.sub };
+  } catch (err: any) {
+    console.warn('ID token verification failed:', err?.message || err);
+    return null;
+  }
+}
+
+/** Express middleware: requires `Authorization: Bearer <Firebase ID token>`. */
+async function requireFirebaseUser(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  const user = token ? await verifyFirebaseIdToken(token) : null;
+  if (!user) {
+    return res.status(401).json({ error: 'Please sign in to use this feature.' });
+  }
+  (req as any).uid = user.uid;
+  next();
+}
 
 // Resilient multi-model Gemini caller with intelligent cascade
 async function callGeminiWithCascade(
   ai: GoogleGenAI,
   contents: any,
   systemInstruction?: string,
-  tools?: any
+  tools?: any,
+  extraConfig?: Record<string, any>,
+  onResponse?: (response: any) => void
 ): Promise<string> {
-  // Ordered cascade: gemini-3.5-flash (required for search/maps), gemini-3.8-flash, gemini-3.1-flash-lite
-  const models = ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-3.1-flash-lite'];
+  // Ordered cascade: gemini-3.5-flash (required for search/maps), gemini-3.8-flash, gemini-3.5-flash-lite
+  // (gemini-3.1-flash-lite is scheduled for shutdown on 2027-05-07: https://ai.google.dev/gemini-api/docs/deprecations)
+  const models = ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite'];
   let lastError: any = null;
 
   for (const model of models) {
@@ -25,6 +119,7 @@ async function callGeminiWithCascade(
       const config: any = {};
       if (systemInstruction) config.systemInstruction = systemInstruction;
       if (tools) config.tools = tools;
+      if (extraConfig) Object.assign(config, extraConfig);
       
       const response = await ai.models.generateContent({
         model,
@@ -32,6 +127,7 @@ async function callGeminiWithCascade(
         config: Object.keys(config).length > 0 ? config : undefined
       });
       if (response?.text) {
+        onResponse?.(response);
         return response.text;
       }
     } catch (err: any) {
@@ -49,265 +145,209 @@ async function callGeminiWithCascade(
   throw lastError || new Error("All candidate Gemini models were unavailable.");
 }
 
-// Synthesize domain-specific repair & troubleshooting guide when all cloud AI endpoints are busy/offline
-function synthesizeTechnicalRepairResponse(userQuery: string, systemInstruction?: string): string {
-  const query = (userQuery || "").toLowerCase();
+// ---- Shared AI route helpers --------------------------------------------------
 
-  // 1. Surname check
-  if (query.includes("surname") || query.includes("last name") || (systemInstruction && systemInstruction.includes("Myende") && query.includes("name"))) {
-    return `### Technician Verification Profile\n\nThe registered user's surname is **Myende**.\n\n*Profile authenticated within DIYELECTRONICS Core Repair Registry.*`;
-  }
+// Read ONLY the server-side key. Never fall back to a VITE_* variable: anything
+// prefixed VITE_ is bundled into the browser, so it must never hold the Gemini key.
+const getGeminiApiKey = () => process.env.GEMINI_API_KEY || '';
 
-  // 2. FRP Lock / Activation Lock / Device Lock engineering query
-  if (query.includes("frp") || query.includes("activation lock") || query.includes("hard reset lock") || query.includes("google lock") || query.includes("bypass")) {
-    return `## Technical Hardware & Security Analysis: Android FRP & Device Provisioning
+const AI_NOT_CONFIGURED = 'The AI assistant is not configured on the server yet. Please try again later.';
+const AI_UNAVAILABLE = 'The AI service is busy or unavailable right now. Please try again in a minute.';
 
-### 1. Architecture of Factory Reset Protection (FRP)
-Factory Reset Protection (FRP) is an Android hardware-backed security mechanism rooted in the device's persistent storage partition:
-- **Storage Target:** The cryptographic state is stored in the \`/dev/block/by-name/persistent\` (or \`frp\`) block partition.
-- **Hardware Binding:** On modern Qualcomm and MediaTek SoCs, the hash of the configured Google accounts is bound with the RPMB (Replay Protected Memory Block) inside the eMMC / UFS chip, preventing unauthenticated software wipes.
-- **Trigger Condition:** FRP triggers whenever a device undergoes an untrusted recovery wipe (via recovery menu button combinations or fastboot) without prior removal of authenticated Google accounts from Settings.
+/** Safety rules shared by every chat persona (kept server-side; clients cannot override them). */
+const CHAT_SAFETY_RULES = `Safety and policy rules (always apply):
+- Never give instructions to bypass, remove or defeat Factory Reset Protection (FRP), Google account locks, iCloud Activation Lock, carrier/network locks, screen passcodes or any other anti-theft protection, even if the user says it is their own device. Politely decline the bypass and instead explain the legitimate owner routes: sign in with the original account, use official account recovery (accounts.google.com/signin/recovery or iforgot.apple.com), or take proof of purchase to the manufacturer, carrier or an authorised service centre.
+- Ordinary hardware diagnosis and repair of a locked device (screen, battery, charging, boards) is fine to help with.
+- Warn clearly about mains voltage, charged capacitors and lithium battery hazards whenever they are relevant.
+- If you are not sure, say so instead of inventing part numbers, measurements or prices.
+- Format answers in clean Markdown with short headings and concise bullet points.`;
 
-### 2. Official Device Owner Provisioning (Enterprise & Diagnostic)
-Authorized repair technicians and enterprise device administrators provision managed hardware using Android's native \`DevicePolicyManager\` API:
-\`\`\`bash
-# Enterprise NFC/QR Device Owner Enrollment payload:
-adb shell dpm set-device-owner com.enterprise.repairagent/.DeviceAdminReceiver
-\`\`\`
-For authorized consumer devices, the standard protocol is:
-1. Boot the device to the initial Welcome Setup Wizard.
-2. Connect to a stable Wi-Fi network with unobstructed access to Google Play Services (\`android.clients.google.com\`).
-3. Enter the original owner credentials, or use the account recovery token generated by the device owner at \`accounts.google.com/signin/recovery\`.
+/** Whitelisted chat modes. The client sends a mode id; it can never send its own system prompt. */
+const CHAT_PERSONAS: Record<string, string> = {
+  copilot: `You are the DIY Electronics repair assistant, built into the DIY Electronics web app. You help people diagnose and repair consumer electronics: component troubleshooting, soldering, multimeter checks, smartphone, laptop, console and TV repair.`,
+  codefox: `You are CODEFOX, the DIY Electronics embedded-systems assistant. You help with microcontrollers (Arduino, ESP32, Raspberry Pi), firmware, and C/C++/Python code. Give working code examples, debugging tips and wiring instructions.`,
+  circuitbear: `You are CIRCUITBEAR, the DIY Electronics circuit-design assistant. You help with circuit theory, PCB layout, power delivery and schematic analysis.`,
+  'phone-repair': `You are the DIY Electronics phone repair assistant. Write practical, step-by-step troubleshooting and repair guides for smartphones. Include a "Required tools" section when relevant.`,
+};
+// Older clients used the persona id "sanwolf" for the main assistant.
+CHAT_PERSONAS.sanwolf = CHAT_PERSONAS.copilot;
 
-### 3. Hardware Diagnostic Procedures
-If the device is malfunctioning during the boot or setup phase:
-- **Volume & Power Keys:** Inspect the physical micro-switches under a stereo microscope. A stuck Volume-Down key can repeatedly force the device into Fastboot/Odin download mode.
-- **VBUS & Battery Rails:** Ensure the battery has at least **3.80V** (below 3.60V the PMIC will brown-out during cryptographic verification).
-- **EDL Mode (Qualcomm):** Verify the EDL test-points (D+ short to GND or dedicated gold pads) are clean and not bridged by corrosion.`;
-  }
-
-  // 3. Screen / Display / Black Screen / Backlight issues
-  if (query.includes("screen") || query.includes("display") || query.includes("black screen") || query.includes("backlight") || query.includes("lcd") || query.includes("oled")) {
-    return `## Display & Backlight Diagnostic Guide
-
-### 1. Visual & Flashlight Inspection
-- Shine a high-intensity inspection light angled at 45° across the panel.
-- If faint desktop or launcher graphics are visible, the display LCD/OLED matrix is operating normally, and the fault is isolated to the **Backlight Boost Circuit** or **OLED Anode/Cathode Supply**.
-
-### 2. Multimeter Diode-Mode Test Points
-Using a digital multimeter in Diode Mode (Red probe on chassis ground, Black probe on connector pins):
-- **Backlight Anode (LEDA / VBOOST):** Expected drop: **0.450V – 0.650V**. Normal active voltage: **15V – 28V DC**.
-- **Backlight Cathode (LEDK1 / LEDK2):** Expected drop: **0.550V – 0.700V**.
-- **MIPI Data / Clock Differential Pairs:** Expected drop: **0.350V – 0.450V** (Each lane must match within ±0.015V; an OL or 0.00V indicates a fractured flex or blown ESD filter).
-- **Logic Rails:** \`VCI\` (**2.8V – 3.3V**) and \`IOVCC\` (**1.8V**).
-
-### 3. Repair Protocol
-1. Clean both male and female FPC connector headers using 99.9% pure Isopropyl Alcohol and ESD-safe bristles.
-2. Inspect the backlight boost diode (typically a Schottky diode like SS14 or similar) for shorting or cracking.
-3. Check the backlight driver IC inductor (10µH - 22µH) for discoloration or open-loop continuity.`;
-  }
-
-  // 4. Battery / Charging / No Power / Bootloop
-  if (query.includes("battery") || query.includes("charge") || query.includes("charging") || query.includes("power") || query.includes("bootloop") || query.includes("drain")) {
-    return `## Power Delivery & Boot Sequence Troubleshooting
-
-### 1. USB-C Power Delivery & VBUS Triage
-Connect the device to an inline USB Power Meter (KM003C or standard bench ammeter):
-- **5V 0.00A (Zero Draw):** Blown primary VBUS protection fuse, shorted TVS diode, or broken USB-C CC/VBUS pins.
-- **5V 0.04A – 0.08A (Stuck Low):** Secondary power stage not enabling; check PMIC crystal oscillator (38.4 MHz or 32.768 kHz).
-- **5V 0.45A – 0.50A (Slow Charge):** USB D+/D- lines floating or open, preventing Fast Charge / Quick Charge / USB-PD handshake.
-- **Cycling 0.00A <-> 0.30A:** Battery under-voltage protection tripped (<2.8V) or thermal sensor (NTC thermistor) line open circuit.
-
-### 2. Battery Terminal Diagnostics
-- **Nominal Cell Voltage:** **3.82V – 4.40V**. If cell reads **< 2.80V**, the internal protection circuit module (PCM) has disconnected output.
-- **Battery Gas Gauge / NTC:** Check resistance between BATT_NTC and GND. Normal room-temperature reading is **10kΩ**. If OL, device will refuse charging and display high/low battery temperature warning.
-
-### 3. Step-by-Step Recovery
-1. Re-activate low battery using an external bench power supply set to **4.0V / 1.0A** with current limiting.
-2. Clean USB-C port cavity of lint and particulate using ceramic tweezers under a magnifying loupe.
-3. Verify main VDD_MAIN / VPH_PWR rail for short circuits before applying full battery voltage.`;
-  }
-
-  // Default universal repair engineering synthesis
-  return `## Hardware Diagnostic Protocol & Repair Guidelines
-
-### 1. Diagnostic Overview: ${userQuery.slice(0, 50)}
-- **Power Stage Status:** Inspect primary supply rails with an inline ammeter before attempting firmware flashing or component replacement.
-- **Visual Inspection:** Examine logic board under a stereo microscope for signs of liquid ingress, corrosion on decoupling capacitors, or physical fracture of BGA chips.
-
-### 2. Benchtop Multimeter Test Matrix
-- **Diode Mode Check:** Connect the **RED probe to chassis ground** and probe target test points with the **BLACK probe**:
-  - Main power bus (\`VDD_MAIN\` / \`VBAT\`): **0.350V – 0.480V**
-  - High-frequency buck converter coils: **0.150V – 0.320V**
-  - Logic I/O rails (\`1.8V\` / \`3.3V\`): **0.400V – 0.550V**
-  - *A continuous beep or reading < 0.050V confirms an active short circuit.*
-- **Thermal Fault Isolation:** If a short is detected, inject **1.0V (current-limited to 1.5A)** onto the affected rail and inspect with isopropyl alcohol or thermal imaging to identify the glowing component.
-
-### 3. Recommended Technician Action
-1. Perform a complete visual inspection of all flexible printed circuits (FPC) and solder bridges.
-2. Clean test pads with 99.9% Isopropyl Alcohol.
-3. Validate reference clock oscillators before condemning the primary system SoC or PMIC.`;
-}
-
-// Synthesize component-level diagnostic telemetry
-function synthesizeComponentTelemetry(
-  componentName: string,
-  componentType: string,
-  deviceModel: string,
-  referenceDesignator: string,
-  customQuery?: string
-): string {
-  const compRef = referenceDesignator || 'U101';
-  const devName = deviceModel || 'Logic Board';
-
-  return `### Component Diagnostic Telemetry: ${componentName} (${compRef})
-**Target Device Architecture:** ${devName}  
-*Mode: Calibrated Hardware Diagnostics Engine (Active Resilience Fallback)*
-
-#### 1. Component Role & Architecture
-- **Reference Designator:** ${compRef} (${componentType || 'Integrated Circuit / Surface Mount'})
-- **Bus & Power Lines:** Regulates primary step-down buck phases and manages internal power sequences across core logic blocks.
-- **Placement & Coupling:** Positioned adjacent to primary filter capacitor arrays and ground return planes to minimize electromagnetic interference (EMI).
-
-#### 2. Characteristic Failure Symptoms
-- **Power Delivery Faults:** Short to ground causing bench power supply current clamp (1.5A–3.5A at 4.2V VDD_MAIN).
-- **Boot Sequence Lock:** Missing power-good (POK) handshake or I2C clock pull-down causing continuous bootloop or 0.00A sleep state.
-- **Thermal Footprint:** Localized rapid thermal spike detectable via thermal imaging or isopropyl alcohol evaporation within 2 seconds.
-${customQuery ? `\n> **Observed Technician Note:** ${customQuery}\n` : ''}
-
-#### 3. Multimeter & Bench Diagnostics
-- **Diode Mode Voltage Drop:** Red probe on chassis ground, Black probe on test points around ${compRef}.
-  - Expected Nominal: **0.350V – 0.520V**.
-  - Fault Threshold: A reading below **0.050V** confirms a dead short to ground.
-- **Resistance to Ground:** Measure power inductors. Output buck rails should show clean resistance (>50Ω for core rails, >100kΩ for IO rails).
-- **VBUS / USB-C Current Test:** Inspect for handshake negation (5V 0.00A or cycling 5V 0.02A indicating missing CC line communication).
-
-#### 4. Micro-Soldering & Pad Rework Protocol
-- **Thermal Profile:** Pre-heat logic board to 140°C. Apply hot air at 345°C–360°C (6mm nozzle, 45% airflow). Avoid overheating adjacent underfilled chips.
-- **Solder Alloy:** Reball using 183°C Sn63/Pb37 paste or 138°C low-temperature bismuth alloy for temperature-sensitive boards.
-- **Post-Rework Verification:** Inspect solder joints under microscope for solder ball bridging, clean remaining rosin flux with pure IPA, and verify diode mode drops before applying battery power.`;
-}
+const MAX_CHAT_MESSAGE_CHARS = 4000;
+const MAX_CHAT_HISTORY_TURNS = 20;
 
 // API routes FIRST
 app.post("/api/chat", async (req, res) => {
+  const { message, history, mode } = req.body || {};
+
+  if (typeof message !== 'string' || !message.trim()) {
+    return res.status(400).json({ error: 'Please type a question first.' });
+  }
+  if (message.length > MAX_CHAT_MESSAGE_CHARS) {
+    return res.status(400).json({ error: `Please keep your question under ${MAX_CHAT_MESSAGE_CHARS} characters.` });
+  }
+
+  const persona = CHAT_PERSONAS[typeof mode === 'string' ? mode : ''] || CHAT_PERSONAS.copilot;
+  const instruction = `${persona}\n\n${CHAT_SAFETY_RULES}`;
+
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
+    return res.status(503).json({ error: AI_NOT_CONFIGURED });
+  }
+
+  const safeHistory = Array.isArray(history)
+    ? history
+        .filter((h: any) => h && (h.role === 'user' || h.role === 'model') && typeof h.text === 'string' && h.text.trim())
+        .slice(-MAX_CHAT_HISTORY_TURNS)
+        .map((h: any) => ({ role: h.role, parts: [{ text: h.text.slice(0, MAX_CHAT_MESSAGE_CHARS) }] }))
+    : [];
+  const contents = [...safeHistory, { role: 'user', parts: [{ text: message.trim() }] }];
+
   try {
-    const { message, history, systemInstruction } = req.body;
-    
-    // In AI Studio, this is automatically injected.
-    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-
-    const instruction = systemInstruction || `You are the embedded AI Co-Pilot for the DIYELECTRONICS web app, a dynamic repair search engine. 
-
-CRITICAL SAFETY & RESPONSE INSTRUCTIONS:
-1. If a user asks about security locks, "FRP Lock", "Activation Lock", or "Hard Reset locks", DO NOT output a standard AI safety refusal text. 
-2. Instead, maintain a helpful, technical repair tone. Focus entirely on explaining the authorized engineering mechanics of the lock system, official device owner provisioning via DevicePolicyManager API frameworks, and hardware diagnostic steps (checking motherboard lines, voltage rails, or recovery buttons).
-3. Always structure your response using clean Markdown with bold headers, visual warning boxes, and concise bullet points that match a bright, playful electronics app design. If asked for the user's surname, state that it is Myende.`;
-
-    let reply = "";
-
-    if (apiKey) {
-      try {
-        const ai = new GoogleGenAI({ apiKey });
-        const contents = history && Array.isArray(history) 
-          ? [...history.map((h: any) => ({ role: h.role, parts: [{ text: h.text }] })), { role: 'user', parts: [{ text: message }] }]
-          : [{ role: 'user', parts: [{ text: message }] }];
-
-        reply = await callGeminiWithCascade(ai, contents, instruction, undefined);
-      } catch {
-        console.warn("Cloud AI models unavailable or rate-limited. Synthesizing diagnostic repair reply...");
-        reply = synthesizeTechnicalRepairResponse(message, instruction);
-      }
-    } else {
-      reply = synthesizeTechnicalRepairResponse(message, instruction);
-    }
-
-    res.json({ reply: reply || synthesizeTechnicalRepairResponse(message, instruction) });
+    const ai = new GoogleGenAI({ apiKey });
+    const reply = await callGeminiWithCascade(ai, contents, instruction, undefined);
+    if (!reply) return res.status(503).json({ error: AI_UNAVAILABLE });
+    res.json({ reply, source: 'gemini' });
   } catch (error: any) {
-    console.error("Gemini API Error in /api/chat:", error);
-    // Never fail with a 500 status - always return a synthesized engineering answer
-    res.json({ reply: synthesizeTechnicalRepairResponse(req.body?.message || "", req.body?.systemInstruction) });
+    console.error("Gemini API Error in /api/chat:", error?.message || error);
+    res.status(503).json({ error: AI_UNAVAILABLE });
+  }
+});
+
+// Electrical Theory Exam Room: generate extra practice questions as JSON.
+// Uses the server-side Gemini cascade; the key never reaches the browser.
+const THEORY_LEVELS = ["school", "college", "university"] as const;
+app.post("/api/theory/generate-questions", async (req, res) => {
+  const body = req.body || {};
+  const level = THEORY_LEVELS.includes(body.level) ? body.level : "college";
+  const count = Math.min(10, Math.max(1, Number(body.count) || 5));
+  const subjects: string[] = Array.isArray(body.subjects) ? body.subjects.filter((s: unknown) => typeof s === "string").slice(0, 12) : [];
+  const topics: { id: string; title: string; subject: string }[] = Array.isArray(body.topics)
+    ? body.topics
+        .filter((t: any) => t && typeof t.id === "string" && typeof t.title === "string")
+        .slice(0, 40)
+        .map((t: any) => ({ id: String(t.id).slice(0, 60), title: String(t.title).slice(0, 120), subject: String(t.subject || "").slice(0, 30) }))
+    : [];
+
+  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) {
+    return res.status(503).json({ error: "AI question generation is not configured on the server", questions: [] });
+  }
+
+  const levelGuide: Record<string, string> = {
+    school: "high-school (Grade 10-12 Physical Sciences / Electrical Technology) level",
+    college: "TVET college / trade level (South African NATED N1-N6 Electrical Trade Theory and Electrotechnics)",
+    university: "university electrical & electronic engineering degree level",
+  };
+
+  const prompt = `Write ${count} NEW, technically accurate practice exam questions at ${levelGuide[level]}.
+Subjects: ${subjects.length ? subjects.join(", ") : "any electrical/electronics subject"}.
+Choose each question's topicId from this list (use the id exactly): ${JSON.stringify(topics.map(t => ({ id: t.id, title: t.title })))}.
+Mix about half multiple-choice and half numeric-answer questions. Use SI units and South African conventions where relevant (230/400 V, 50 Hz).
+Double-check every calculation. Numeric answers must be a single number in the stated unit.
+Return ONLY a JSON array (no markdown fences, no commentary). Each element must be one of:
+{"type":"mcq","topicId":"...","difficulty":1-3,"prompt":"...","options":["...","...","...","..."],"answerIndex":0-3,"solution":"short worked solution"}
+{"type":"numeric","topicId":"...","difficulty":1-3,"prompt":"...","answer":12.5,"unit":"V","tolerance":0.02,"solution":"short worked solution with the calculation"}`;
+
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const text = await callGeminiWithCascade(ai, [{ role: "user", parts: [{ text: prompt }] }],
+      "You are a meticulous electrical engineering examiner. You output strictly valid JSON only.");
+    const cleaned = (text || "").replace(/```(?:json)?/gi, "").trim();
+    const start = cleaned.indexOf("[");
+    const end = cleaned.lastIndexOf("]");
+    if (start < 0 || end <= start) throw new Error("No JSON array in model output");
+    const parsed = JSON.parse(cleaned.slice(start, end + 1));
+    if (!Array.isArray(parsed)) throw new Error("Model output is not an array");
+    const validTopicIds = new Set(topics.map(t => t.id));
+    const questions = parsed
+      .filter((q: any) => q && typeof q === "object" && typeof q.prompt === "string" && typeof q.solution === "string")
+      .map((q: any) => {
+        const topicId = typeof q.topicId === "string" && (validTopicIds.size === 0 || validTopicIds.has(q.topicId)) ? q.topicId : topics[0]?.id;
+        const difficulty = Math.min(3, Math.max(1, Math.round(Number(q.difficulty) || 2)));
+        if (q.type === "mcq" && Array.isArray(q.options)) {
+          const options = q.options.filter((o: unknown) => typeof o === "string").slice(0, 6);
+          const answerIndex = Number(q.answerIndex);
+          if (options.length < 2 || !Number.isInteger(answerIndex) || answerIndex < 0 || answerIndex >= options.length) return null;
+          return { type: "mcq", topicId, difficulty, prompt: q.prompt, options, answerIndex, solution: q.solution };
+        }
+        if (q.type === "numeric") {
+          const answer = Number(q.answer);
+          if (!Number.isFinite(answer)) return null;
+          const tol = Number(q.tolerance);
+          return { type: "numeric", topicId, difficulty, prompt: q.prompt, answer, unit: typeof q.unit === "string" ? q.unit : "", tolerance: Number.isFinite(tol) && tol >= 0 && tol <= 0.2 ? tol : 0.02, solution: q.solution };
+        }
+        return null;
+      })
+      .filter(Boolean)
+      .slice(0, count);
+    res.json({ level, questions });
+  } catch (error: any) {
+    console.warn("Theory question generation failed:", error?.message || error);
+    res.status(502).json({ error: "The AI could not generate questions right now", questions: [] });
   }
 });
 
 app.post("/api/component-diagnostics", async (req, res) => {
   const { componentName, componentType, deviceModel, referenceDesignator, firestoreMetadata, customQuery } = req.body || {};
-  const cName = componentName || 'Target IC';
-  const dModel = deviceModel || 'Smartphone / Logic Board';
-  const refDes = referenceDesignator || 'U101';
+  const cName = String(componentName || 'Target IC').slice(0, 200);
+  const dModel = String(deviceModel || 'Smartphone / Logic Board').slice(0, 200);
+  const refDes = String(referenceDesignator || 'U101').slice(0, 50);
+
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
+    return res.status(503).json({ success: false, error: AI_NOT_CONFIGURED });
+  }
 
   try {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-
-    if (!apiKey) {
-      return res.json({
-        success: true,
-        componentName: cName,
-        deviceModel: dModel,
-        diagnosticGuide: synthesizeComponentTelemetry(cName, componentType, dModel, refDes, customQuery)
-      });
-    }
-
     const ai = new GoogleGenAI({ apiKey });
 
-    const prompt = `You are an elite micro-soldering hardware engineer and circuit diagnostics expert.
-Analyze this component on the 3D motherboard:
+    const prompt = `You are an experienced micro-soldering hardware engineer and circuit diagnostics expert.
+Analyze this component on the motherboard:
 - Component Name: ${cName}
-- Component Type / Classification: ${componentType || 'Integrated Circuit / Surface Mount'}
+- Component Type / Classification: ${String(componentType || 'Integrated Circuit / Surface Mount').slice(0, 200)}
 - Board Reference Designator: ${refDes}
 - Target Device Model: ${dModel}
-${firestoreMetadata ? `- Verified Database Metadata: ${typeof firestoreMetadata === 'string' ? firestoreMetadata : JSON.stringify(firestoreMetadata)}` : ''}
-${customQuery ? `- User Specific Diagnostic Note / Error: ${customQuery}` : ''}
+${firestoreMetadata ? `- Database Metadata: ${(typeof firestoreMetadata === 'string' ? firestoreMetadata : JSON.stringify(firestoreMetadata)).slice(0, 2000)}` : ''}
+${customQuery ? `- User Specific Diagnostic Note / Error: ${String(customQuery).slice(0, 1000)}` : ''}
 
-Provide an exhaustive, professional component diagnosis formatted with clean Markdown:
-1. **Component Role & Architecture**: What ${cName} does on the ${dModel} motherboard (power domains, step-down rails, bus protocol, clock lines).
-2. **Failure Symptoms & Behavior**: What happens when this component fails or shorts (e.g. bootloop, 0.00A current draw, VDD short to ground, thermal hot spots, missing backlight, USB-C PD failure).
-3. **Benchtop Multimeter & Oscilloscope Diagnostics**:
-   - Diode mode voltage drop readings (red probe to ground, black probe to test points).
-   - Resistance to ground (checking for shorted BUCK coils or decoupling capacitors).
-   - DC power bench test current draw characteristics.
-4. **Step-by-Step Micro-soldering & Replacement Protocol**:
-   - Safe hot air temperature, nozzle size, and airflow (avoiding CPU/NAND underfill eruption).
-   - Flux selection, stencil solder paste (183°C or 138°C bismuth alloy), and pad prep.
-   - Verification test before reassembly.
-Structure using clear bold headings, visual warning notes, and practical technician bullet points.`;
+Provide a professional component diagnosis formatted with clean Markdown:
+1. **Component Role**: What ${cName} does on the ${dModel} board (power domains, rails, bus protocol, clock lines).
+2. **Failure Symptoms**: What happens when this component fails or shorts.
+3. **Bench Diagnostics**: diode-mode readings, resistance to ground, current-draw characteristics. Say clearly when values are typical rather than model-specific.
+4. **Replacement Protocol**: safe hot-air settings, flux/solder choice, pad prep, and verification before reassembly.
+If you are not certain of model-specific values, say so instead of inventing them.`;
 
-    const systemInstruction = `You are the embedded 3D Hardware Diagnostic Engine for DIYELECTRONICS. You specialize in component-level motherboard repairs, schematics tracing, and PCB diagnostics.`;
+    const systemInstruction = `You are the hardware diagnostic assistant for DIY Electronics. You specialize in component-level motherboard repairs, schematics tracing, and PCB diagnostics.`;
 
-    let diagnosticGuide = "";
-    try {
-      diagnosticGuide = await callGeminiWithCascade(
-        ai,
-        [{ role: 'user', parts: [{ text: prompt }] }],
-        systemInstruction,
-        undefined
-      );
-    } catch {
-      console.warn("Cloud models unavailable or rate-limited for component diagnostics. Synthesizing hardware calibration guide...");
-      diagnosticGuide = synthesizeComponentTelemetry(cName, componentType, dModel, refDes, customQuery);
-    }
+    const diagnosticGuide = await callGeminiWithCascade(
+      ai,
+      [{ role: 'user', parts: [{ text: prompt }] }],
+      systemInstruction,
+      undefined
+    );
 
     res.json({
       success: true,
       componentName: cName,
       deviceModel: dModel,
-      diagnosticGuide: diagnosticGuide || synthesizeComponentTelemetry(cName, componentType, dModel, refDes, customQuery)
+      diagnosticGuide,
+      source: 'gemini'
     });
   } catch (error: any) {
-    console.error("Component Diagnostics Error:", error);
-    res.json({
-      success: true,
-      componentName: cName,
-      deviceModel: dModel,
-      diagnosticGuide: synthesizeComponentTelemetry(cName, componentType, dModel, refDes, customQuery)
-    });
+    console.error("Component Diagnostics Error:", error?.message || error);
+    res.status(503).json({ success: false, error: AI_UNAVAILABLE });
   }
 });
 
-app.post("/api/gemini-grounded", async (req, res) => {
-  const { prompt, useMaps } = req.body;
+// Not called by the web app today; kept for future use but restricted to signed-in users.
+app.post("/api/gemini-grounded", requireFirebaseUser, async (req, res) => {
+  const { prompt, useMaps } = req.body || {};
+  if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > MAX_CHAT_MESSAGE_CHARS) {
+    return res.status(400).json({ error: 'A prompt under 4000 characters is required.' });
+  }
   try {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) throw new Error("No API key");
+    const apiKey = getGeminiApiKey();
+    if (!apiKey) return res.status(503).json({ error: AI_NOT_CONFIGURED });
     const ai = new GoogleGenAI({ apiKey });
     
     const tools = useMaps ? [{ googleMaps: {} }] : [{ googleSearch: {} }];
@@ -320,11 +360,15 @@ app.post("/api/gemini-grounded", async (req, res) => {
   }
 });
 
-app.post("/api/transcribe-audio", async (req, res) => {
-  const { base64Audio, mimeType } = req.body;
+// Not called by the web app today; kept for future use but restricted to signed-in users.
+app.post("/api/transcribe-audio", requireFirebaseUser, async (req, res) => {
+  const { base64Audio, mimeType } = req.body || {};
+  if (typeof base64Audio !== 'string' || !base64Audio) {
+    return res.status(400).json({ error: 'base64Audio is required.' });
+  }
   try {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) throw new Error("No API key");
+    const apiKey = getGeminiApiKey();
+    if (!apiKey) return res.status(503).json({ error: AI_NOT_CONFIGURED });
     const ai = new GoogleGenAI({ apiKey });
     
     const response = await ai.models.generateContent({
@@ -344,11 +388,23 @@ app.post("/api/transcribe-audio", async (req, res) => {
   }
 });
 
-app.post("/api/generate-video", async (req, res) => {
-    const { prompt, aspectRatio } = req.body;
+// Veo video generation is expensive and not used by the web app, so it is OFF unless
+// ENABLE_VIDEO_GENERATION=true is set on the server, and even then needs a signed-in user.
+// Note: veo-3.1-fast-generate-preview is scheduled for shutdown on 2026-10-22
+// (https://ai.google.dev/gemini-api/docs/deprecations); switch models before enabling.
+app.post("/api/generate-video", (req, res, next) => {
+    if (process.env.ENABLE_VIDEO_GENERATION !== 'true') {
+        return res.status(404).json({ error: 'Video generation is not enabled.' });
+    }
+    next();
+}, requireFirebaseUser, async (req, res) => {
+    const { prompt, aspectRatio } = req.body || {};
+    if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 2000) {
+        return res.status(400).json({ error: 'A prompt under 2000 characters is required.' });
+    }
     try {
-        const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-        if (!apiKey) throw new Error("No API key");
+        const apiKey = getGeminiApiKey();
+        if (!apiKey) return res.status(503).json({ error: AI_NOT_CONFIGURED });
         const ai = new GoogleGenAI({ apiKey });
         
         const operation = await ai.models.generateVideos({
@@ -357,7 +413,7 @@ app.post("/api/generate-video", async (req, res) => {
             config: {
                 numberOfVideos: 1,
                 resolution: '1080p',
-                aspectRatio: aspectRatio || '16:9'
+                aspectRatio: aspectRatio === '9:16' ? '9:16' : '16:9'
             }
         });
         
@@ -382,18 +438,10 @@ app.post("/api/device-search", async (req, res) => {
     const reply = await callGeminiWithCascade(ai, [{ role: 'user', parts: [{ text: prompt }] }]);
     const deviceData = JSON.parse(reply.replace(/```json/g, '').replace(/```/g, '').trim());
 
-    // Save to Firestore
-    try {
-        const docRef = await addDoc(collection(db, 'discoveredDevices'), {
-            ...deviceData,
-            timestamp: serverTimestamp(),
-            source: 'ai-discovery'
-        });
-        res.json({ id: docRef.id, ...deviceData });
-    } catch (e) {
-        console.error("Failed to save device:", e);
-        res.json(deviceData); // Return data even if save fails
-    }
+    // The server has no Firebase (client SDK only runs in the browser and we
+    // intentionally avoid adding firebase-admin), so discovered devices are not
+    // persisted here. Just return the AI-generated data to the client.
+    res.json(deviceData);
   } catch (error) {
     console.error("Device Search Error:", error);
     res.status(500).json({ error: "Device search failed" });
@@ -407,7 +455,7 @@ app.post("/api/blueprint-search", async (req, res) => {
   
   // Local search
   const localMatch = [...initialParts, ...initialGuides].find(item =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    ((item as any).name ?? (item as any).title)?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (item as any).deviceModel?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -2059,12 +2107,982 @@ function synthesizeBlueprintTelemetry(target: string): string {
   - Inspect underfill edges with 100x microscope before heating to prevent solder ball squeeze-out.`;
 }
 
+// ---- Device catalog: model picture lookup via Wikipedia (GET /api/model-image?q=<brand model>) ----
+const modelImageCache = new Map<string, { url: string | null; title: string | null; at: number }>();
+const MODEL_IMAGE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const modelImageTokens = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter((t) => t.length >= 2);
+app.get("/api/model-image", async (req, res) => {
+  const q = String(req.query.q || "").trim().slice(0, 120);
+  if (!q) return res.status(400).json({ error: "q is required" });
+  const key = q.toLowerCase();
+  const cached = modelImageCache.get(key);
+  if (cached && Date.now() - cached.at < MODEL_IMAGE_TTL_MS) {
+    res.set("Cache-Control", "public, max-age=86400");
+    return res.json({ url: cached.url, title: cached.title, cached: true });
+  }
+  const headers = { "User-Agent": "DIYElectronicsApp/1.0 (device catalog model images)", Accept: "application/json" };
+  let url: string | null = null;
+  let title: string | null = null;
+  try {
+    const os = await fetch(`https://en.wikipedia.org/w/api.php?action=opensearch&format=json&limit=4&namespace=0&search=${encodeURIComponent(q)}`, { headers });
+    const osJson: any = os.ok ? await os.json() : [];
+    const titles: string[] = Array.isArray(osJson?.[1]) ? osJson[1] : [];
+    const qTokens = modelImageTokens(q);
+    for (const t of titles) {
+      // Require real overlap with the query so a brand-only match ("Defy (song)") is not used.
+      const overlap = modelImageTokens(t).filter((tok) => qTokens.includes(tok)).length;
+      if (overlap < Math.min(2, qTokens.length)) continue;
+      const r = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(t.replace(/ /g, "_"))}`, { headers });
+      if (!r.ok) continue;
+      const j: any = await r.json();
+      if (j?.type === "disambiguation") continue;
+      const img = j?.thumbnail?.source || j?.originalimage?.source;
+      if (img) { url = img; title = j?.title || t; break; }
+    }
+  } catch (e) {
+    console.error("model-image lookup failed:", e);
+  }
+  if (modelImageCache.size > 5000) modelImageCache.clear();
+  modelImageCache.set(key, { url, title, at: Date.now() });
+  res.set("Cache-Control", "public, max-age=86400");
+  res.json({ url, title });
+});
+
+// ==== Real PCB board search (GET /api/boards/search?q=<board number>&include=photos,links,info) ====
+// Real photos from Wikimedia Commons (with licence + author), board facts from Gemini with Google
+// Search grounding (every fact cited; "unknown" when nothing is found), and plain search links to
+// schematic/boardview communities (links are searches, never claims that a file exists).
+// Community photos live in Firestore `boards/{n}` and are queried from the browser.
+const BOARD_SEARCH_WINDOW_MS = 5 * 60 * 1000;
+const BOARD_SEARCH_MAX = Number(process.env.BOARD_SEARCH_LIMIT_PER_5MIN) || 40;
+const BOARD_INFO_MAX = Number(process.env.BOARD_INFO_LIMIT_PER_5MIN) || 12;
+const boardSearchBuckets = new Map<string, { count: number; info: number; resetAt: number }>();
+const BOARD_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const boardPhotoCache = new Map<string, { at: number; photos: any[] }>();
+const boardInfoCache = new Map<string, { at: number; info: any }>();
+
+/** Same rules as normalizeBoardNumber() in src/lib/boards.ts: uppercase, separators -> '-', max 64. */
+function normalizeBoardQuery(raw: string): string {
+  return String(raw || '')
+    .normalize('NFKC')
+    .toUpperCase()
+    .replace(/[\u2010-\u2015]/g, '-')
+    .replace(/[^A-Z0-9._\- /]+/g, ' ')
+    .trim()
+    .replace(/[\s/]+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^[-._]+|[-._]+$/g, '')
+    .slice(0, 64);
+}
+const compactBoard = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]+/g, '');
+const stripHtml = (s: any) => String(s || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+/** Looks like a part/board number (has digits, no spaces) rather than a description like "iPhone X logic board". */
+const looksLikePartNumber = (display: string) => /\d/.test(display) && !/\s/.test(display.trim());
+
+function boardRateCheck(req: express.Request, wantsInfo: boolean): { ok: boolean; retryAfter: number; infoAllowed: boolean } {
+  const now = Date.now();
+  const ip = getClientIp(req);
+  let b = boardSearchBuckets.get(ip);
+  if (!b || b.resetAt <= now) {
+    b = { count: 0, info: 0, resetAt: now + BOARD_SEARCH_WINDOW_MS };
+    boardSearchBuckets.set(ip, b);
+  }
+  if (boardSearchBuckets.size > 10000) {
+    for (const [k, v] of boardSearchBuckets) if (v.resetAt <= now) boardSearchBuckets.delete(k);
+  }
+  b.count += 1;
+  const retryAfter = Math.ceil((b.resetAt - now) / 1000);
+  if (b.count > BOARD_SEARCH_MAX) return { ok: false, retryAfter, infoAllowed: false };
+  if (wantsInfo) b.info += 1;
+  return { ok: true, retryAfter, infoAllowed: b.info <= BOARD_INFO_MAX };
+}
+
+const BOARD_GENERIC_WORDS = new Set(['board', 'boards', 'logic', 'logicboard', 'main', 'mainboard', 'motherboard', 'pcb', 'pcba', 'the', 'of']);
+
+async function searchCommonsBoardPhotos(display: string): Promise<any[]> {
+  const isPart = looksLikePartNumber(display);
+  const words = display.split(/\s+/).filter(Boolean);
+  const coreWords = words.filter((w) => !BOARD_GENERIC_WORDS.has(w.toLowerCase()));
+  const wantsBoardShot = coreWords.length < words.length; // user typed "logic board", "motherboard", ...
+  const core = (coreWords.length ? coreWords : words).join(' ').replace(/"/g, '');
+  // filetype:bitmap keeps PDFs/scans out; quotes keep the number / model name together.
+  const search = `"${isPart ? display.replace(/"/g, '') : core}" filetype:bitmap`;
+  const params = new URLSearchParams({
+    action: 'query', format: 'json', formatversion: '2', origin: '*',
+    generator: 'search', gsrnamespace: '6', gsrlimit: '30', gsrsearch: search,
+    prop: 'imageinfo', iiprop: 'url|extmetadata|mime|size', iiurlwidth: '800',
+    iiextmetadatafilter: 'LicenseShortName|LicenseUrl|Artist|ImageDescription|Credit|AttributionRequired|UsageTerms',
+  });
+  const resp = await fetch(`https://commons.wikimedia.org/w/api.php?${params}`, {
+    headers: { 'User-Agent': 'DIYElectronicsApp/1.0 (real PCB board search; diy.electronicsa@gmail.com)', Accept: 'application/json' },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!resp.ok) throw new Error(`commons ${resp.status}`);
+  const json: any = await resp.json();
+  const pages: any[] = json?.query?.pages || [];
+  const qCompact = compactBoard(display);
+  // Generic words ("logic board") are not required verbatim; every other word must appear as a whole word,
+  // and when the user asked for a board, the photo must at least be described as a board / PCB.
+  const qTokens = core.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const wordRe = qTokens.map((t) => new RegExp(`(^|[^a-z0-9])${t}([^a-z0-9]|$)`));
+  const out: any[] = [];
+  for (const pg of pages.sort((a, b) => (a.index || 0) - (b.index || 0))) {
+    const ii = pg?.imageinfo?.[0];
+    if (!ii || !/^image\/(jpeg|png|webp|gif)$/.test(ii.mime || '')) continue;
+    const meta = ii.extmetadata || {};
+    const title = String(pg.title || '').replace(/^File:/, '');
+    const description = stripHtml(meta.ImageDescription?.value).slice(0, 400);
+    const hay = `${title} ${description}`;
+    // Relevance guard: Commons full-text search is loose, so the board number (or every word of a
+    // descriptive query) must actually appear in the file title or description.
+    const relevant = isPart
+      ? compactBoard(hay).includes(qCompact)
+      : qTokens.length > 0 && wordRe.every((re) => re.test(hay.toLowerCase()))
+        && (!wantsBoardShot || /board|pcb|motherboard|circuit|teardown|internals|inside/i.test(hay));
+    if (!relevant) continue;
+    out.push({
+      title,
+      thumbUrl: ii.thumburl || ii.url,
+      url: ii.url,
+      width: ii.width, height: ii.height,
+      pageUrl: ii.descriptionurl || `https://commons.wikimedia.org/wiki/${encodeURIComponent(String(pg.title).replace(/ /g, '_'))}`,
+      description,
+      license: stripHtml(meta.LicenseShortName?.value) || stripHtml(meta.UsageTerms?.value) || 'See source page',
+      licenseUrl: stripHtml(meta.LicenseUrl?.value) || null,
+      artist: stripHtml(meta.Artist?.value).slice(0, 160) || stripHtml(meta.Credit?.value).slice(0, 160) || 'Unknown author',
+      source: 'Wikimedia Commons',
+    });
+    if (out.length >= 12) break;
+  }
+  return out;
+}
+
+function buildBoardReferenceLinks(display: string) {
+  const exact = `"${display}"`;
+  const g = (q: string) => `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+  return [
+    { label: 'Google Images: exact board number', url: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(exact)}`, kind: 'images' },
+    { label: 'Schematic / boardview PDF search', url: g(`${exact} schematic OR boardview filetype:pdf`), kind: 'schematic' },
+    { label: 'Badcaps forums', url: g(`${exact} site:badcaps.net`), kind: 'forum' },
+    { label: 'iFixit', url: g(`${exact} site:ifixit.com`), kind: 'guide' },
+    { label: 'Rossmann Group forum', url: g(`${exact} site:rossmanngroup.com`), kind: 'forum' },
+    { label: 'EEVblog forum', url: g(`${exact} site:eevblog.com`), kind: 'forum' },
+    { label: 'Elektrotanya (service manuals)', url: g(`${exact} site:elektrotanya.com`), kind: 'schematic' },
+    { label: 'YouTube repair videos', url: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${display} repair`)}`, kind: 'video' },
+    { label: 'eBay (donor / replacement boards)', url: `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(display)}`, kind: 'shop' },
+  ];
+}
+
+function parseJsonLoose(text: string): any {
+  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
+  const body = fenced ? fenced[1] : text;
+  const start = body.indexOf('{');
+  const end = body.lastIndexOf('}');
+  if (start === -1 || end <= start) return null;
+  try { return JSON.parse(body.slice(start, end + 1)); } catch { return null; }
+}
+
+const strArr = (v: any, max: number, len = 160) =>
+  (Array.isArray(v) ? v : []).filter((x) => typeof x === 'string' && x.trim()).slice(0, max).map((x: string) => x.trim().slice(0, len));
+
+async function fetchBoardInfoGrounded(ai: GoogleGenAI, display: string): Promise<any> {
+  const prompt = `You are a cautious electronics repair researcher. Use Google Search to look up the printed circuit board / part number "${display}".
+Return ONLY a JSON object (no prose) with exactly these keys:
+{
+ "found": boolean,                 // false if search results do not clearly identify this exact board
+ "boardNumber": string,            // the number as commonly written
+ "manufacturer": string|null,
+ "boardType": string|null,         // e.g. "logic board", "TV main board", "power supply board", "motherboard"
+ "devices": string[],              // devices/models this board is used in
+ "keyICs": [{"role": string, "part": string}],   // e.g. role "PMIC", "CPU/SoC", "Charging IC", "Backlight driver"
+ "commonFaults": string[],
+ "notes": string[]                 // short practical notes (alternative numbers, revisions, compatibility)
+}
+Rules: Only include facts supported by the search results. Never guess or invent part numbers, ICs or faults. If something is not found, use null or an empty array. If the board cannot be identified, set "found": false and leave the arrays empty.`;
+  let grounding: any = null;
+  const text = await callGeminiWithCascade(ai, [{ role: 'user', parts: [{ text: prompt }] }], undefined, [{ googleSearch: {} }], undefined,
+    (r) => { grounding = r?.candidates?.[0]?.groundingMetadata || null; });
+  const parsed = parseJsonLoose(text) || {};
+  const seen = new Set<string>();
+  const sources: { title: string; url: string }[] = [];
+  for (const c of grounding?.groundingChunks || []) {
+    const url = c?.web?.uri;
+    if (typeof url !== 'string' || !/^https?:\/\//.test(url) || seen.has(url)) continue;
+    seen.add(url);
+    sources.push({ title: String(c.web.title || new URL(url).hostname).slice(0, 160), url });
+    if (sources.length >= 10) break;
+  }
+  const keyICs = (Array.isArray(parsed.keyICs) ? parsed.keyICs : [])
+    .filter((x: any) => x && typeof x.part === 'string' && x.part.trim())
+    .slice(0, 16)
+    .map((x: any) => ({ role: String(x.role || 'IC').slice(0, 60), part: String(x.part).slice(0, 120) }));
+  // Without grounding sources nothing can be cited, so report it as unknown rather than trusting the model.
+  const found = parsed.found === true && sources.length > 0;
+  return {
+    found,
+    boardNumber: typeof parsed.boardNumber === 'string' ? parsed.boardNumber.slice(0, 80) : display,
+    manufacturer: found && typeof parsed.manufacturer === 'string' ? parsed.manufacturer.slice(0, 80) : null,
+    boardType: found && typeof parsed.boardType === 'string' ? parsed.boardType.slice(0, 80) : null,
+    devices: found ? strArr(parsed.devices, 20) : [],
+    keyICs: found ? keyICs : [],
+    commonFaults: found ? strArr(parsed.commonFaults, 12, 240) : [],
+    notes: found ? strArr(parsed.notes, 8, 300) : [],
+    sources,
+    disclaimer: 'Summarised by AI from the cited web sources. Verify against the schematic for your exact board revision.',
+  };
+}
+
+app.get('/api/boards/search', async (req, res) => {
+  const display = String(req.query.q || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const normalized = normalizeBoardQuery(display);
+  if (!normalized || normalized.length < 2) return res.status(400).json({ error: 'Enter a board or part number (at least 2 characters).' });
+  const include = new Set(String(req.query.include || 'photos,links,info').split(',').map((s) => s.trim()));
+  const wantsInfo = include.has('info');
+  const rate = boardRateCheck(req, wantsInfo && !boardInfoCache.has(normalized));
+  if (!rate.ok) {
+    res.setHeader('Retry-After', String(rate.retryAfter));
+    return res.status(429).json({ error: 'Too many board searches. Please wait a few minutes.' });
+  }
+  const now = Date.now();
+  const body: any = { query: display, normalized, links: buildBoardReferenceLinks(display) };
+  const tasks: Promise<void>[] = [];
+
+  if (include.has('photos')) {
+    tasks.push((async () => {
+      const hit = boardPhotoCache.get(normalized);
+      if (hit && now - hit.at < BOARD_CACHE_TTL_MS) { body.photos = hit.photos; return; }
+      try {
+        const photos = await searchCommonsBoardPhotos(display);
+        if (boardPhotoCache.size > 3000) boardPhotoCache.clear();
+        boardPhotoCache.set(normalized, { at: now, photos });
+        body.photos = photos;
+      } catch (e: any) {
+        console.warn('commons board search failed:', e?.message || e);
+        body.photos = [];
+        body.photosError = 'Wikimedia Commons could not be reached right now.';
+      }
+    })());
+  }
+
+  let infoStatus = 200;
+  if (wantsInfo) {
+    tasks.push((async () => {
+      const hit = boardInfoCache.get(normalized);
+      if (hit && now - hit.at < BOARD_CACHE_TTL_MS) { body.info = hit.info; return; }
+      const ai = getGeminiClient();
+      if (!ai) { body.info = null; body.infoError = AI_NOT_CONFIGURED; infoStatus = 503; return; }
+      if (!rate.infoAllowed) { body.info = null; body.infoError = 'Board lookups are rate-limited. Try again in a few minutes.'; infoStatus = 429; return; }
+      try {
+        const info = await fetchBoardInfoGrounded(ai, display);
+        if (boardInfoCache.size > 2000) boardInfoCache.clear();
+        boardInfoCache.set(normalized, { at: now, info });
+        body.info = info;
+      } catch (e: any) {
+        console.warn('board info lookup failed:', e?.message || e);
+        body.info = null; body.infoError = AI_UNAVAILABLE; infoStatus = 503;
+      }
+    })());
+  }
+
+  await Promise.all(tasks);
+  if (infoStatus === 200) res.set('Cache-Control', 'public, max-age=3600');
+  res.status(infoStatus).json(body);
+});
+
+// ==== Universal device & component pages ===========================================
+// GET /api/universal/device?q=<any device>      -> grounded overview (specs, faults, repairability, teardown notes)
+// GET /api/universal/component?q=<part number>  -> grounded component sheet (specs, pinout, equivalents)
+// Facts come from Gemini with Google Search grounding; nothing is reported as found unless the
+// response cites at least one web source. Images come from Wikipedia (page summary thumbnails).
+// The browser caches successful results in Firestore (discoveredDevices / discoveredComponents)
+// so a page is researched once and then becomes a permanent, shareable page.
+const UNI_WINDOW_MS = 5 * 60 * 1000;
+const UNI_MAX = Number(process.env.UNIVERSAL_LOOKUP_LIMIT_PER_5MIN) || 10;
+const uniBuckets = new Map<string, { count: number; resetAt: number }>();
+const uniCache = new Map<string, { at: number; body: any }>();
+const UNI_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+function uniRateCheck(req: express.Request): { ok: boolean; retryAfter: number } {
+  const now = Date.now();
+  const ip = getClientIp(req);
+  let b = uniBuckets.get(ip);
+  if (!b || b.resetAt <= now) {
+    b = { count: 0, resetAt: now + UNI_WINDOW_MS };
+    uniBuckets.set(ip, b);
+  }
+  if (uniBuckets.size > 10000) {
+    for (const [k, v] of uniBuckets) if (v.resetAt <= now) uniBuckets.delete(k);
+  }
+  b.count += 1;
+  return { ok: b.count <= UNI_MAX, retryAfter: Math.ceil((b.resetAt - now) / 1000) };
+}
+
+function collectGroundingSources(grounding: any, max = 10): { title: string; url: string }[] {
+  const seen = new Set<string>();
+  const sources: { title: string; url: string }[] = [];
+  for (const c of grounding?.groundingChunks || []) {
+    const url = c?.web?.uri;
+    if (typeof url !== 'string' || !/^https?:\/\//.test(url) || seen.has(url)) continue;
+    seen.add(url);
+    let host = url;
+    try { host = new URL(url).hostname; } catch { /* keep url */ }
+    sources.push({ title: String(c.web.title || host).slice(0, 160), url: url.slice(0, 1000) });
+    if (sources.length >= max) break;
+  }
+  return sources;
+}
+
+/** Best Wikipedia lead image for a query (requires real word overlap so unrelated pages are skipped). */
+async function lookupWikipediaImage(q: string): Promise<{ url: string; title: string; pageUrl: string } | null> {
+  const headers = { 'User-Agent': 'DIYElectronicsApp/1.0 (universal device pages; diy.electronicsa@gmail.com)', Accept: 'application/json' };
+  try {
+    const os = await fetch(`https://en.wikipedia.org/w/api.php?action=opensearch&format=json&limit=5&namespace=0&search=${encodeURIComponent(q)}`, { headers, signal: AbortSignal.timeout(6000) });
+    const osJson: any = os.ok ? await os.json() : [];
+    const titles: string[] = Array.isArray(osJson?.[1]) ? osJson[1] : [];
+    const qTokens = modelImageTokens(q);
+    for (const t of titles) {
+      const overlap = modelImageTokens(t).filter((tok) => qTokens.includes(tok)).length;
+      if (overlap < Math.min(2, qTokens.length)) continue;
+      const r = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(t.replace(/ /g, '_'))}`, { headers, signal: AbortSignal.timeout(6000) });
+      if (!r.ok) continue;
+      const j: any = await r.json();
+      if (j?.type === 'disambiguation') continue;
+      const img = j?.thumbnail?.source || j?.originalimage?.source;
+      if (img) return { url: String(img), title: String(j?.title || t).slice(0, 160), pageUrl: String(j?.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(t.replace(/ /g, '_'))}`) };
+    }
+  } catch (e: any) {
+    console.warn('wikipedia image lookup failed:', e?.message || e);
+  }
+  return null;
+}
+
+const kvArr = (v: any, max: number) =>
+  (Array.isArray(v) ? v : [])
+    .filter((x: any) => x && typeof x.label === 'string' && x.label.trim() && (typeof x.value === 'string' || typeof x.value === 'number'))
+    .slice(0, max)
+    .map((x: any) => ({ label: String(x.label).trim().slice(0, 60), value: String(x.value).trim().slice(0, 200) }));
+
+/** Device types the client can map back to its catalog (free text otherwise). */
+async function fetchDeviceGrounded(ai: GoogleGenAI, q: string): Promise<any> {
+  const prompt = `You are a careful electronics repair researcher. Use Google Search to identify the device "${q}" (it may be any electronic or electrical product ever made: phone, appliance, tool, vehicle module, medical home device, musical gear, industrial controller, toy, etc.).
+Return ONLY a JSON object (no prose) with exactly these keys:
+{
+ "found": boolean,               // false unless search results clearly identify a real product
+ "name": string,                 // full product name, e.g. "Samsung Galaxy A15 5G"
+ "brand": string|null,
+ "model": string|null,           // model / series name
+ "modelNumbers": string[],       // official model / part numbers (e.g. "SM-A156B")
+ "deviceType": string|null,      // generic type, e.g. "Smartphone", "Washing machine", "Blood pressure monitor"
+ "releaseYear": number|null,
+ "summary": string,              // 1-3 factual sentences
+ "specs": [{"label": string, "value": string}],
+ "identification": string[],     // how to tell this model apart / where the model number is printed
+ "commonFaults": string[],       // only faults reported in the sources
+ "repairability": {"score": number|null, "source": string|null, "notes": string[]},  // score only if a published score exists (e.g. iFixit 0-10, EU repairability index); never invent one
+ "teardownNotes": string[],      // what is inside / how it opens, from teardown sources
+ "keyParts": string[]            // replaceable parts commonly sold for it
+}
+Rules: only include facts supported by the search results. Never guess. Use null or [] when unknown. If the device cannot be identified, set "found": false.`;
+  let grounding: any = null;
+  const text = await callGeminiWithCascade(ai, [{ role: 'user', parts: [{ text: prompt }] }], undefined, [{ googleSearch: {} }], undefined,
+    (r) => { grounding = r?.candidates?.[0]?.groundingMetadata || null; });
+  const p = parseJsonLoose(text) || {};
+  const sources = collectGroundingSources(grounding);
+  const found = p.found === true && sources.length > 0 && typeof p.name === 'string' && p.name.trim().length > 1;
+  const rep = p.repairability && typeof p.repairability === 'object' ? p.repairability : {};
+  const score = typeof rep.score === 'number' && rep.score >= 0 && rep.score <= 10 && typeof rep.source === 'string' && rep.source.trim() ? Math.round(rep.score * 10) / 10 : null;
+  return {
+    found,
+    query: q,
+    name: found ? String(p.name).trim().slice(0, 120) : q,
+    brand: found && typeof p.brand === 'string' ? p.brand.slice(0, 60) : null,
+    model: found && typeof p.model === 'string' ? p.model.slice(0, 100) : null,
+    modelNumbers: found ? strArr(p.modelNumbers, 12, 60) : [],
+    deviceType: found && typeof p.deviceType === 'string' ? p.deviceType.slice(0, 60) : null,
+    releaseYear: found && typeof p.releaseYear === 'number' && p.releaseYear > 1800 && p.releaseYear < 2100 ? Math.round(p.releaseYear) : null,
+    summary: found && typeof p.summary === 'string' ? p.summary.slice(0, 600) : '',
+    specs: found ? kvArr(p.specs, 24) : [],
+    identification: found ? strArr(p.identification, 8, 240) : [],
+    commonFaults: found ? strArr(p.commonFaults, 14, 240) : [],
+    repairability: found ? { score, source: score !== null ? String(rep.source).slice(0, 120) : null, notes: strArr(rep.notes, 6, 240) } : { score: null, source: null, notes: [] },
+    teardownNotes: found ? strArr(p.teardownNotes, 10, 300) : [],
+    keyParts: found ? strArr(p.keyParts, 16, 80) : [],
+    sources,
+    disclaimer: 'Summarised by AI from the cited web sources. Check the rating label on your unit and the manufacturer documentation before repairing.',
+  };
+}
+
+/** Keys shared with the Multimeter section (/multimeter/test/:component). */
+const COMPONENT_TEST_KEYS = ['resistor', 'capacitor', 'electrolytic-capacitor', 'diode', 'zener-diode', 'led', 'bridge-rectifier', 'bjt-transistor', 'mosfet', 'igbt', 'triac', 'scr', 'voltage-regulator', 'ic', 'optocoupler', 'fuse', 'varistor', 'thermistor', 'relay', 'transformer', 'inductor', 'crystal', 'switch', 'motor', 'speaker', 'battery', 'sensor'];
+
+function componentReferenceLinks(pn: string, manufacturer?: string | null) {
+  const g = (q: string) => `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+  const links = [
+    { label: 'Alldatasheet', url: `https://www.alldatasheet.com/view.jsp?Searchword=${encodeURIComponent(pn)}`, kind: 'datasheet' },
+    { label: 'Octopart (stock, prices, datasheets)', url: `https://octopart.com/search?q=${encodeURIComponent(pn)}`, kind: 'datasheet' },
+    { label: 'Datasheet PDF search', url: g(`"${pn}" datasheet filetype:pdf`), kind: 'datasheet' },
+    { label: 'Datasheet Archive', url: `https://www.datasheetarchive.com/search?q=${encodeURIComponent(pn)}`, kind: 'datasheet' },
+    { label: 'LCSC', url: `https://www.lcsc.com/search?q=${encodeURIComponent(pn)}`, kind: 'shop' },
+    { label: 'Mouser', url: `https://www.mouser.com/c/?q=${encodeURIComponent(pn)}`, kind: 'shop' },
+    { label: 'DigiKey', url: `https://www.digikey.com/en/products/result?keywords=${encodeURIComponent(pn)}`, kind: 'shop' },
+    { label: 'Equivalents / substitutes search', url: g(`"${pn}" equivalent OR replacement OR substitute`), kind: 'equivalent' },
+    { label: 'YouTube: how to test', url: `https://www.youtube.com/results?search_query=${encodeURIComponent(`how to test ${pn}`)}`, kind: 'video' },
+  ];
+  if (manufacturer) links.splice(3, 0, { label: `${manufacturer} official datasheet`, url: g(`${manufacturer} "${pn}" datasheet`), kind: 'datasheet' });
+  return links;
+}
+
+async function fetchComponentGrounded(ai: GoogleGenAI, pn: string): Promise<any> {
+  const prompt = `You are a careful electronic component engineer. Use Google Search to look up the electronic component / part number "${pn}" (IC, transistor, MOSFET, diode, regulator, capacitor, connector, module, sensor, etc.).
+Return ONLY a JSON object (no prose) with exactly these keys:
+{
+ "found": boolean,            // false unless search results clearly identify this exact part
+ "partNumber": string,
+ "manufacturer": string|null,
+ "category": string|null,     // e.g. "N-channel MOSFET", "Buck converter IC", "Schottky diode"
+ "testKey": string|null,      // one of: ${COMPONENT_TEST_KEYS.join(', ')}
+ "description": string,
+ "package": string|null,      // e.g. "TO-220", "SOT-23", "SOIC-8"
+ "specs": [{"label": string, "value": string}],    // key ratings from the datasheet (Vds, Id, Rds(on), Vin range, ...)
+ "pinout": [{"pin": string, "name": string, "function": string}],
+ "equivalents": string[],     // only substitutes named in the sources; note any rating differences
+ "applications": string[],    // typical devices / circuits it is used in
+ "markings": string[],        // SMD marking codes if documented
+ "testNotes": string[]        // how to check it with a multimeter, from the sources
+}
+Rules: only include facts supported by the search results (prefer the official datasheet). Never invent pinouts, ratings or equivalents. Use null or [] when unknown.`;
+  let grounding: any = null;
+  const text = await callGeminiWithCascade(ai, [{ role: 'user', parts: [{ text: prompt }] }], undefined, [{ googleSearch: {} }], undefined,
+    (r) => { grounding = r?.candidates?.[0]?.groundingMetadata || null; });
+  const p = parseJsonLoose(text) || {};
+  const sources = collectGroundingSources(grounding);
+  const found = p.found === true && sources.length > 0;
+  const pinout = (Array.isArray(p.pinout) ? p.pinout : [])
+    .filter((x: any) => x && (typeof x.pin === 'string' || typeof x.pin === 'number') && typeof x.name === 'string')
+    .slice(0, 64)
+    .map((x: any) => ({ pin: String(x.pin).slice(0, 12), name: String(x.name).slice(0, 40), function: String(x.function || '').slice(0, 160) }));
+  const testKey = typeof p.testKey === 'string' && COMPONENT_TEST_KEYS.includes(p.testKey) ? p.testKey : null;
+  const manufacturer = found && typeof p.manufacturer === 'string' ? p.manufacturer.slice(0, 80) : null;
+  return {
+    found,
+    query: pn,
+    partNumber: found && typeof p.partNumber === 'string' && p.partNumber.trim() ? p.partNumber.trim().slice(0, 64) : pn,
+    manufacturer,
+    category: found && typeof p.category === 'string' ? p.category.slice(0, 80) : null,
+    testKey: found ? testKey : null,
+    description: found && typeof p.description === 'string' ? p.description.slice(0, 600) : '',
+    package: found && typeof p.package === 'string' ? p.package.slice(0, 60) : null,
+    specs: found ? kvArr(p.specs, 30) : [],
+    pinout: found ? pinout : [],
+    equivalents: found ? strArr(p.equivalents, 16, 120) : [],
+    applications: found ? strArr(p.applications, 12, 160) : [],
+    markings: found ? strArr(p.markings, 10, 40) : [],
+    testNotes: found ? strArr(p.testNotes, 8, 300) : [],
+    sources,
+    links: componentReferenceLinks(pn, manufacturer),
+    disclaimer: 'Summarised by AI from the cited sources. Always confirm ratings and pinout in the official datasheet before substituting a part.',
+  };
+}
+
+function universalHandler(kind: 'device' | 'component') {
+  return async (req: express.Request, res: express.Response) => {
+    const q = String(req.query.q || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+    if (q.length < 2) return res.status(400).json({ error: kind === 'device' ? 'Type a device name (at least 2 characters).' : 'Type a part number (at least 2 characters).' });
+    const key = `${kind}:${q.toLowerCase()}`;
+    const hit = uniCache.get(key);
+    if (hit && Date.now() - hit.at < UNI_CACHE_TTL_MS) {
+      res.set('Cache-Control', 'public, max-age=3600');
+      return res.json({ ...hit.body, cached: true });
+    }
+    const rate = uniRateCheck(req);
+    if (!rate.ok) {
+      res.setHeader('Retry-After', String(rate.retryAfter));
+      return res.status(429).json({ error: 'Too many lookups. Please wait a few minutes and try again.' });
+    }
+    const ai = getGeminiClient();
+    if (!ai) {
+      // Without AI we can still offer the deterministic search links (components) and an image (devices).
+      const body: any = { found: false, query: q, sources: [], aiError: AI_NOT_CONFIGURED };
+      if (kind === 'component') body.links = componentReferenceLinks(q);
+      else body.image = await lookupWikipediaImage(q);
+      return res.status(503).json(body);
+    }
+    try {
+      const [info, image] = await Promise.all([
+        kind === 'device' ? fetchDeviceGrounded(ai, q) : fetchComponentGrounded(ai, q),
+        kind === 'device' ? lookupWikipediaImage(q) : Promise.resolve(null),
+      ]);
+      let img = image;
+      if (kind === 'device' && !img && info.found && info.name && info.name.toLowerCase() !== q.toLowerCase()) img = await lookupWikipediaImage(info.name);
+      const body = { ...info, image: img };
+      if (uniCache.size > 3000) uniCache.clear();
+      uniCache.set(key, { at: Date.now(), body });
+      res.set('Cache-Control', 'public, max-age=3600');
+      res.json(body);
+    } catch (e: any) {
+      console.warn(`universal ${kind} lookup failed:`, e?.message || e);
+      const body: any = { found: false, query: q, sources: [], aiError: AI_UNAVAILABLE };
+      if (kind === 'component') body.links = componentReferenceLinks(q);
+      res.status(503).json(body);
+    }
+  };
+}
+
+app.get('/api/universal/device', universalHandler('device'));
+app.get('/api/universal/component', universalHandler('component'));
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
+
+// ---- AI pro-tips & video tutorial routes (ported from original DIYELECTRONICS-web-app) ----
+const getGeminiClient = () => {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) return null;
+  return new GoogleGenAI({ apiKey });
+};
+
+const CURATED_MISTAKES_BY_MODEL: Record<string, any> = {
+  macbook: {
+    summary: 'High risk of irreversible CPU kill via long-screw damage or probing 12V PPBUS_G3H with high-voltage probe slip into adjacent 1.8V lines.',
+    benchDoAndDonts: [
+      { doTip: 'Keep screws in a magnetic organizational project mat labeled by exact hole length.', dontMistake: 'Never mix up Torx screw lengths; driving a long screw into logic board ground layers cuts inner copper traces (Long-Screw Damage).' },
+      { doTip: 'Disconnect battery data flex AND battery screw terminal before connecting any bench probe.', dontMistake: 'Never plug or unplug LCD eDP ribbon cable with battery connected; 50V backlight rail instantly bridges to CPU eDP data lines, frying the SoC.' },
+      { doTip: 'Use Kapton tape around BGA chips when reflowing or desoldering nearby passive capacitors.', dontMistake: 'Never blast 400°C hot air directly over underfilled RAM chips without shielding.' }
+    ],
+    commonMistakes: [
+      {
+        id: 'mb_1',
+        mistakeTitle: 'Hot-Plugging LCD Cable with Battery Connected',
+        whyItHappens: 'Technicians rushing display swaps forget that the 50V PPVOUT_S0_LCDBKLT rail is permanently energized even in sleep mode.',
+        preventionTip: 'Disconnect the battery screw terminal and hold power button 10s to drain caps before touching the LCD connector.',
+        riskLevel: 'Critical Damage',
+        componentOrArea: 'eDP Display Connector (J8500)'
+      },
+      {
+        id: 'mb_2',
+        mistakeTitle: 'Long-Screw Damage on Shield Standoffs',
+        whyItHappens: 'Outer hinge screws are 3.5mm while trackpad shield screws are 1.8mm. Driving a 3.5mm screw drills directly into multi-layer PCB traces.',
+        preventionTip: 'Use a labeled magnetic silicone screw tray. If a screw encounters resistance before sitting flush, stop immediately.',
+        riskLevel: 'Critical Damage',
+        componentOrArea: 'Logic Board Standoff Threads'
+      },
+      {
+        id: 'mb_3',
+        mistakeTitle: 'Probing PPBUS_G3H Near Low-Voltage Data Rails with Thick Probes',
+        whyItHappens: 'Standard multimeter needles slip between tiny 0201 passives, bridging 12.6V PPBUS straight into 1.8V PMIC data lines.',
+        preventionTip: 'Use micro-needle needle-point 0.1mm probe tips with insulated heat-shrink sleeves.',
+        riskLevel: 'High Risk',
+        componentOrArea: 'PPBUS_G3H Inductor & Capacitors'
+      }
+    ],
+    torqueOrTempSpecs: [
+      { label: 'Hot Air Soldering Temp', spec: '340°C - 355°C @ 45% air' },
+      { label: 'Bottom Preheat Plate', spec: '110°C for 5 mins' },
+      { label: 'P5 Pentalobe Torque', spec: '0.25 Nm (finger tight)' }
+    ]
+  },
+  nintendo: {
+    summary: 'Delicate FPC ribbon latches, fragile battery connector tabs, and USB-C port pin bridging during solder rework.',
+    benchDoAndDonts: [
+      { doTip: 'Use a plastic dental pick or spudger to open micro zero-insertion-force (ZIF) lock flaps.', dontMistake: 'Never pry micro ribbon latches upwards with metal tweezers; the plastic hinge snaps off permanently.' },
+      { doTip: 'Verify 0.00Ω dead short on capacitor next to M92T36 pin 5 before applying power.', dontMistake: 'Never replace the USB-C port with a generic phone port; the Switch uses an asymmetrical custom dual-row 24-pin connector.' },
+      { doTip: 'Use a preheating plate at 150°C when desoldering the dual-row USB-C connector.', dontMistake: 'Never tug on the USB-C port while solder is still pasty; you will tear the hidden inner PCB trace pads.' }
+    ],
+    commonMistakes: [
+      {
+        id: 'ns_1',
+        mistakeTitle: 'Snapping the MicroSD Card Reader FPC Connector',
+        whyItHappens: 'The daughterboard connector is extremely brittle and snaps if lifted at an angle instead of straight vertical pop.',
+        preventionTip: 'Lift gently using a nylon pry tool right beneath the connector center.',
+        riskLevel: 'High Risk',
+        componentOrArea: 'J4001 MicroSD FPC Connector'
+      },
+      {
+        id: 'ns_2',
+        mistakeTitle: 'Tearing the Joy-Con Rail ZIF Latch',
+        whyItHappens: 'The black lever on the Joy-Con ribbon socket is 0.3mm thin; twisting it cracks the retainer bracket.',
+        preventionTip: 'Use a plastic ESD pry tool to flip the latch 90 degrees gently.',
+        riskLevel: 'Caution',
+        componentOrArea: 'Joy-Con Rail ZIF Socket'
+      },
+      {
+        id: 'ns_3',
+        mistakeTitle: 'Bridging Hidden Bottom USB-C Ground & VBUS Pins',
+        whyItHappens: 'The inner 12 pins of the Switch USB-C port are concealed underneath the metal shell and cannot be inspected by eye.',
+        preventionTip: 'Flood with low-melt bismuth solder, pre-tin all 24 pins with liquid flux, and check with a USB breakout tester board before powering on.',
+        riskLevel: 'Critical Damage',
+        componentOrArea: 'USB-C 24-Pin Receptacle'
+      }
+    ],
+    torqueOrTempSpecs: [
+      { label: 'USB-C Desolder Temp', spec: '380°C hot air + 150°C bottom preheat' },
+      { label: 'M92T36 QFN Solder Temp', spec: '340°C with tacky rosin flux' },
+      { label: 'Tri-Point Y00 Screws', spec: 'Do not over-torque; strip easily' }
+    ]
+  },
+  playstation: {
+    summary: 'Liquid metal spillage on APU capacitors, Southbridge BGA detachment, and HDMI port replacement trace delamination.',
+    benchDoAndDonts: [
+      { doTip: 'Apply silicone thermal barrier foam or conformal coating around APU passives when servicing liquid metal.', dontMistake: 'Never tilt the PS5 motherboard vertically while liquid metal is unsealed; conductive droplets short out SMD caps.' },
+      { doTip: 'Preheat the thick 12-layer PS5 motherboard on a hot plate at 180°C before attempting HDMI replacement.', dontMistake: 'Never crank hot air to 450°C without preheating; the huge copper ground planes will wick the heat and blister the PCB surface.' },
+      { doTip: 'Check continuity on HDMI diode filters before and after installing a new connector.', dontMistake: 'Never force the optical drive ribbon cable; the drive daughterboard is paired uniquely to the APU via firmware encryption.' }
+    ],
+    commonMistakes: [
+      {
+        id: 'ps_1',
+        mistakeTitle: 'Liquid Metal Droplet Migration to SMD Capacitors',
+        whyItHappens: 'When opening the APU heatsink, gallium-indium liquid metal oxidizes and beads, dripping onto bare 0402 APU bypass caps.',
+        preventionTip: 'Mop up liquid metal with lint-free swabs soaked in 99.9% IPA before lifting the main board, and inspect under 20x magnification.',
+        riskLevel: 'Critical Damage',
+        componentOrArea: 'APU Perimeter Capacitor Array'
+      },
+      {
+        id: 'ps_2',
+        mistakeTitle: 'Ripping HDMI Port Anchor Post Ground Pads',
+        whyItHappens: 'PS5 anchor legs are soldered with high-temp lead-free solder into heavy copper internal layers.',
+        preventionTip: 'Use low-melt solder alloy (138°C melting point) on all four anchor posts to lower thermal mass before hot air extraction.',
+        riskLevel: 'High Risk',
+        componentOrArea: 'HDMI 2.1 Female Port'
+      },
+      {
+        id: 'ps_3',
+        mistakeTitle: 'Losing or Damaging the Paired Optical Drive Daughterboard',
+        whyItHappens: 'On PS4 / PS5 consoles, swapping or breaking the disc board causes SU-42118-6 errors and blocks all future system firmware updates.',
+        preventionTip: 'Always retain the original disc drive logic controller board with its native console pairing.',
+        riskLevel: 'Critical Damage',
+        componentOrArea: 'Optical Drive Motherboard Flex'
+      }
+    ],
+    torqueOrTempSpecs: [
+      { label: 'Bottom Preheat Plate', spec: '180°C for 6 mins' },
+      { label: 'Hot Air HDMI Extraction', spec: '380°C - 400°C @ 60% air' },
+      { label: 'APU Clamp Screw Torque', spec: '0.45 Nm in cross-pattern' }
+    ]
+  },
+  samsung: {
+    summary: 'OLED screen flex tearing at bottom curved bezel, thermal sensor cable rip during rear glass removal, and moisture sensor sub-flex damage.',
+    benchDoAndDonts: [
+      { doTip: 'Heat rear cover evenly to exactly 75°C - 80°C on a temperature-controlled heating mat.', dontMistake: 'Never slice opening picks deeper than 3mm on the right edge where the volume ribbon cable sits.' },
+      { doTip: 'Use a plastic battery spudger with 2 drops of adhesive remover to lift the Li-ion battery.', dontMistake: 'Never puncture, bend, or use sharp metal blades on lithium pouch cells; thermal runaway fire risk.' },
+      { doTip: 'Inspect the sub-PBA moisture detection pins under microscope after ultrasonic cleaning.', dontMistake: 'Never ignore moisture warning prompts by forcing 45W PPS charging; CC lines will burn out.' }
+    ],
+    commonMistakes: [
+      {
+        id: 'sam_1',
+        mistakeTitle: 'Slicing Wireless Charging Coil / NFC Thermal Antenna',
+        whyItHappens: 'Adhesive near camera module is dense; inserting pry picks deeply cuts through the copper foil antenna.',
+        preventionTip: 'Follow outer edge guideline and visually check pick depth under LED bench lamp.',
+        riskLevel: 'Caution',
+        componentOrArea: 'Rear Glass & Qi Charging Assembly'
+      },
+      {
+        id: 'sam_2',
+        mistakeTitle: 'Overheating AMOLED Display Past 85°C',
+        whyItHappens: 'Excess heat burns organic LED emissive layers, causing yellow burn marks or dead pixel clusters.',
+        preventionTip: 'Limit hot mat temperature strictly to 80°C and duration to 5 minutes maximum.',
+        riskLevel: 'High Risk',
+        componentOrArea: 'Dynamic AMOLED 2X Panel'
+      },
+      {
+        id: 'sam_3',
+        mistakeTitle: 'Damaging mmWave Antenna Coaxial Connectors',
+        whyItHappens: 'Prying miniature micro-coaxial plugs sideways shears the tiny center signal pin.',
+        preventionTip: 'Use specialized coaxial puller tweezers lifting straight upward at a 90° angle.',
+        riskLevel: 'High Risk',
+        componentOrArea: '5G mmWave Sub-Board Coax'
+      }
+    ],
+    torqueOrTempSpecs: [
+      { label: 'Heat Mat Temp', spec: '75°C - 80°C' },
+      { label: 'Display Frame Adhesive Cure', spec: 'Clamp with 2kg pressure 15 mins' },
+      { label: 'Phillips #00 Screws', spec: 'Hand tight (0.15 Nm)' }
+    ]
+  },
+  xbox: {
+    summary: '12V power supply busbar shorting, MOSFET DrMOS gate thermal runaway, and southbridge APU solder fatigue.',
+    benchDoAndDonts: [
+      { doTip: 'Discharge the heavy 12V busbar capacitors before probing the split motherboard sandwich.', dontMistake: 'Never power up the Xbox Series X motherboard split apart without the inter-board connector fully seated.' },
+      { doTip: 'Inject no more than 1.0V at 2A when searching for shorted DrMOS power stages.', dontMistake: 'Never inject 12V directly into a shorted 12V rail; if the high-side MOSFET is blown, 12V will fry the main APU core instantly.' }
+    ],
+    commonMistakes: [
+      {
+        id: 'xb_1',
+        mistakeTitle: 'Injecting Excessive Voltage on 12V Rail with Blown High-Side MOSFET',
+        whyItHappens: 'When a DrMOS or buck MOSFET fails, drain-to-source is shorted. Injecting 12V sends full voltage directly into the 0.85V AMD APU core.',
+        preventionTip: 'Always check resistance between the 12V rail and VCore inductor before injecting voltage. Limit bench supply to 0.9V.',
+        riskLevel: 'Critical Damage',
+        componentOrArea: '12V VCore DrMOS VRM'
+      },
+      {
+        id: 'xb_2',
+        mistakeTitle: 'Stripping Torx T8 Security Screws on Main Heatsink Vapor Chamber',
+        whyItHappens: 'Factory threadlocker requires firm downward axial force before rotating.',
+        preventionTip: 'Use high-grade hardened S2 steel Torx bits with calibrated downward pressure.',
+        riskLevel: 'Caution',
+        componentOrArea: 'Vapor Chamber Heatsink Bracket'
+      }
+    ],
+    torqueOrTempSpecs: [
+      { label: 'Voltage Injection Limit', spec: 'Max 1.0V @ 3A max' },
+      { label: 'DrMOS Replacement Temp', spec: '350°C @ 50% air' }
+    ]
+  }
+};
+
+// Dynamic Pro-Tips & Common Mistakes Route
+app.post('/api/repair/pro-tips', async (req, res) => {
+  const { deviceModel, deviceCategory, issueType } = req.body || {};
+
+  if (!deviceModel && !deviceCategory) {
+    return res.status(400).json({ error: 'Device model or category is required.' });
+  }
+
+  const modelStr = `${deviceModel || ''} ${deviceCategory || ''}`.toLowerCase();
+
+  // Find a matching entry in the hand-written (curated) tips. No match means no curated
+  // fallback: we never show tips for a different device family.
+  let matchedKey: string | null = null;
+  if (modelStr.includes('switch') || modelStr.includes('nintendo') || modelStr.includes('joy-con')) {
+    matchedKey = 'nintendo';
+  } else if (modelStr.includes('playstation') || modelStr.includes('ps5') || modelStr.includes('ps4') || modelStr.includes('sony')) {
+    matchedKey = 'playstation';
+  } else if (modelStr.includes('samsung') || modelStr.includes('galaxy')) {
+    matchedKey = 'samsung';
+  } else if (modelStr.includes('xbox') || modelStr.includes('series x') || modelStr.includes('microsoft')) {
+    matchedKey = 'xbox';
+  } else if (modelStr.includes('macbook')) {
+    matchedKey = 'macbook';
+  }
+
+  const curated = matchedKey ? CURATED_MISTAKES_BY_MODEL[matchedKey] : null;
+  const curatedResponse = (source: string) => ({
+    success: true,
+    deviceModel: deviceModel || 'Electronics',
+    summary: curated.summary,
+    benchDoAndDonts: curated.benchDoAndDonts,
+    commonMistakes: curated.commonMistakes,
+    torqueOrTempSpecs: curated.torqueOrTempSpecs,
+    source,
+  });
+
+  const ai = getGeminiClient();
+
+  if (!ai) {
+    if (curated) return res.json(curatedResponse('curated'));
+    return res.status(503).json({ success: false, error: AI_NOT_CONFIGURED });
+  }
+
+  try {
+    const prompt = `You are an experienced electronics repair engineer and micro-soldering technician.
+Analyze the following specific device being repaired:
+- Device Model: ${String(deviceModel || '').slice(0, 200)}
+- Device Category: ${String(deviceCategory || 'Electronics').slice(0, 200)}
+- Specific Issue: ${String(issueType || 'General teardown and component replacement').slice(0, 300)}
+
+Generate a specific "Pro-Tips & Common Mistakes" briefing for bench work on this device model.
+Identify real-world pitfalls technicians run into (e.g. long-screw damage, snapping brittle ZIF latches, heat damage, bridging pins, tearing hidden ribbon cables, stripping screws, ESD damage).
+If you are not sure about a model-specific value, give a typical range and say it is typical.
+
+Return valid JSON with this exact structure:
+{
+  "summary": "1-2 sentence warning of the biggest risk for this model",
+  "benchDoAndDonts": [ { "doTip": "Specific action to take", "dontMistake": "Specific pitfall to avoid" } ],
+  "commonMistakes": [
+    {
+      "id": "m_1",
+      "mistakeTitle": "Descriptive title of the pitfall",
+      "whyItHappens": "Why technicians make this mistake",
+      "preventionTip": "Concrete preventive technique, tool, or multimeter check",
+      "riskLevel": "Caution" | "High Risk" | "Critical Damage",
+      "componentOrArea": "Component or connector name"
+    }
+  ],
+  "torqueOrTempSpecs": [ { "label": "e.g. Soldering Temp", "spec": "e.g. 340°C - 350°C" } ]
+}`;
+
+    const text = await callGeminiWithCascade(ai, prompt, undefined, undefined, { responseMimeType: 'application/json' });
+    const parsed = JSON.parse(text || '{}');
+    if (!parsed.summary && !Array.isArray(parsed.commonMistakes)) throw new Error('Empty AI response');
+
+    return res.json({
+      success: true,
+      deviceModel: deviceModel || 'Electronics',
+      summary: parsed.summary || '',
+      benchDoAndDonts: Array.isArray(parsed.benchDoAndDonts) ? parsed.benchDoAndDonts : [],
+      commonMistakes: Array.isArray(parsed.commonMistakes) ? parsed.commonMistakes : [],
+      torqueOrTempSpecs: Array.isArray(parsed.torqueOrTempSpecs) ? parsed.torqueOrTempSpecs : [],
+      source: 'gemini',
+    });
+  } catch (error: any) {
+    console.error('Pro-Tips AI generation error:', error?.message || error);
+    if (curated) return res.json(curatedResponse('curated_fallback'));
+    return res.status(503).json({ success: false, error: AI_UNAVAILABLE });
+  }
+});
+
+/** A real YouTube search for repair videos of this device/issue (we do not host or invent videos). */
+function buildYouTubeSearchUrl(...parts: (string | undefined)[]): string {
+  const q = [...parts.filter(Boolean), 'repair'].join(' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+}
+
+// AI chaptered walkthrough for a repair guide (text only: no generated or sample video,
+// no invented instructor). The response includes a real YouTube search link instead.
+app.post('/api/repair/video-tutorial', async (req, res) => {
+  const { title, deviceModel, deviceCategory, issueType, steps, toolsRequired } = req.body || {};
+  const youtubeSearchUrl = buildYouTubeSearchUrl(deviceModel, issueType || title);
+
+  const ai = getGeminiClient();
+  if (!ai) {
+    return res.status(503).json({ success: false, error: AI_NOT_CONFIGURED, youtubeSearchUrl });
+  }
+
+  const stepSummary = Array.isArray(steps)
+    ? steps.slice(0, 20).map((s: any, i: number) => `${i + 1}. ${String(s?.title || s?.text || s?.description || '').slice(0, 200)}`).join('\n')
+    : '';
+
+  try {
+    const prompt = `You are an electronics repair instructor writing a chaptered walkthrough for a repair guide.
+Device Model: "${String(deviceModel || 'Electronics device').slice(0, 200)}"
+Category: "${String(deviceCategory || 'Electronics').slice(0, 200)}"
+Guide Title: "${String(title || 'Bench repair').slice(0, 200)}"
+Issue: "${String(issueType || 'Component failure').slice(0, 300)}"
+Tools: ${Array.isArray(toolsRequired) ? toolsRequired.slice(0, 30).join(', ') : 'Standard bench tools'}
+${stepSummary ? `Guide steps:\n${stepSummary}` : ''}
+
+Write a clear, technical walkthrough split into 4 to 6 chapters (disassembly, inspection/probing, repair or replacement, reassembly and testing).
+If you are not sure of a model-specific value, give a typical range and say it is typical.
+Return ONLY a valid JSON object:
+{
+  "title": "Concise walkthrough title",
+  "benchSafetyProtocol": "Critical safety rules for this specific device and repair",
+  "magnificationLevel": "e.g. 10x - 30x stereo microscope, or 'Not needed'",
+  "hotAirReworkTemp": "e.g. 340°C - 350°C @ 45% airflow, or 'Not needed'",
+  "chapters": [
+    {
+      "id": "chap_1",
+      "title": "Chapter name",
+      "actionSummary": "What is done in this chapter and how",
+      "benchTool": "Tools used in this chapter",
+      "cautionNotice": "Hazard or common mistake to avoid",
+      "multimeterMode": "Measurement mode if applicable, or 'Visual inspection'",
+      "targetComponents": ["Component 1"]
+    }
+  ],
+  "keyTakeaways": ["Takeaway 1", "Takeaway 2", "Takeaway 3"]
+}`;
+
+    const text = await callGeminiWithCascade(ai, prompt, undefined, undefined, { responseMimeType: 'application/json' });
+    const parsed = JSON.parse(text || '{}');
+    const chapters = Array.isArray(parsed.chapters) ? parsed.chapters.slice(0, 8) : [];
+    if (chapters.length === 0) throw new Error('AI returned no chapters');
+
+    return res.json({
+      success: true,
+      tutorial: {
+        title: parsed.title || (title ? `Walkthrough: ${title}` : `Repair walkthrough for ${deviceModel || 'your device'}`),
+        deviceModel: deviceModel || '',
+        issueType: issueType || '',
+        benchSafetyProtocol: parsed.benchSafetyProtocol || '',
+        magnificationLevel: parsed.magnificationLevel || '',
+        hotAirReworkTemp: parsed.hotAirReworkTemp || '',
+        chapters: chapters.map((c: any, i: number) => ({ ...c, id: c?.id || `chap_${i + 1}` })),
+        keyTakeaways: Array.isArray(parsed.keyTakeaways) ? parsed.keyTakeaways.slice(0, 6) : [],
+        youtubeSearchUrl,
+      },
+      source: 'gemini',
+    });
+  } catch (error: any) {
+    console.error('AI walkthrough generation error:', error?.message || error);
+    return res.status(503).json({ success: false, error: AI_UNAVAILABLE, youtubeSearchUrl });
+  }
+});
+
+// Structured AI symptom diagnosis for the Diagnostic Tool.
+// Returns JSON only from the model; no invented confidence scores or prices.
+app.post('/api/diagnose', async (req, res) => {
+  const { category, model, symptom, powerStatus, visualSigns } = req.body || {};
+  const clean = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+  const input = {
+    category: clean(category, 100),
+    model: clean(model, 200),
+    symptom: clean(symptom, 2000),
+    powerStatus: clean(powerStatus, 300),
+    visualSigns: clean(visualSigns, 1000),
+  };
+  if (!input.symptom) {
+    return res.status(400).json({ error: 'Please describe the symptom first.' });
+  }
+
+  const ai = getGeminiClient();
+  if (!ai) return res.status(503).json({ error: AI_NOT_CONFIGURED });
+
+  const prompt = `Diagnose this electronics fault for a repair technician or DIY repairer.
+Device category: ${input.category || 'Unknown'}
+Device brand/model: ${input.model || 'Unknown'}
+Symptom: ${input.symptom}
+Power / current-draw behaviour: ${input.powerStatus || 'Not measured'}
+Visual signs: ${input.visualSigns || 'None reported'}
+
+Return ONLY valid JSON with this structure:
+{
+  "probableCause": "Most likely fault, in one line",
+  "otherPossibleCauses": ["Other plausible cause", "..."],
+  "severity": "Low" | "Medium" | "High" | "Critical",
+  "safetyWarning": "The most important safety precaution for this repair",
+  "requiredTools": ["Tool", "..."],
+  "testPoints": ["A measurement to take and what a good vs bad reading looks like", "..."],
+  "steps": [ { "stepNumber": 1, "title": "Short title", "detail": "What to do" } ],
+  "partToSource": "Name/part number of the most likely replacement part, or empty string if unknown",
+  "whenToStop": "When the user should stop and take it to a professional"
+}
+Rules: Base severity on safety risk and damage risk. Do not invent exact part numbers or measurements you are unsure of; say a value is typical when it is. Do not include prices or confidence percentages. Never suggest bypassing FRP, iCloud/Activation Lock or other anti-theft locks.`;
+
+  try {
+    const text = await callGeminiWithCascade(
+      ai,
+      prompt,
+      'You are the DIY Electronics diagnostic assistant: a careful, safety-first electronics repair engineer.',
+      undefined,
+      { responseMimeType: 'application/json' }
+    );
+    const parsed = JSON.parse(text || '{}');
+    if (!parsed.probableCause) throw new Error('AI returned no diagnosis');
+    const severities = ['Low', 'Medium', 'High', 'Critical'];
+    const strList = (v: any, n: number) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.trim()).slice(0, n) : []);
+    return res.json({
+      diagnosis: {
+        probableCause: String(parsed.probableCause),
+        otherPossibleCauses: strList(parsed.otherPossibleCauses, 5),
+        severity: severities.includes(parsed.severity) ? parsed.severity : 'Medium',
+        safetyWarning: typeof parsed.safetyWarning === 'string' ? parsed.safetyWarning : '',
+        requiredTools: strList(parsed.requiredTools, 12),
+        testPoints: strList(parsed.testPoints, 10),
+        steps: Array.isArray(parsed.steps)
+          ? parsed.steps.slice(0, 10).map((s: any, i: number) => ({
+              stepNumber: Number(s?.stepNumber) || i + 1,
+              title: String(s?.title || `Step ${i + 1}`),
+              detail: String(s?.detail || ''),
+            }))
+          : [],
+        partToSource: typeof parsed.partToSource === 'string' ? parsed.partToSource.slice(0, 120) : '',
+        whenToStop: typeof parsed.whenToStop === 'string' ? parsed.whenToStop : '',
+      },
+      source: 'gemini',
+    });
+  } catch (error: any) {
+    console.error('Diagnose route error:', error?.message || error);
+    return res.status(503).json({ error: AI_UNAVAILABLE });
+  }
+});
+
+
+
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -2083,4 +3101,8 @@ async function startServer() {
   });
 }
 
-startServer();
+// On Netlify the API runs as a serverless function (netlify/functions/api.ts),
+// so only start a long-running server when running locally or on a normal host.
+if (!process.env.NETLIFY && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  startServer();
+}

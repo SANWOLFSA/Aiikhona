@@ -1,4 +1,6 @@
 import { UserProfile } from '../types';
+import { APP_THEMES, DEFAULT_THEME_ID } from './theme';
+import { NEUTRAL_AVATAR as DEFAULT_AVATAR } from './avatar';
 
 const Nt = {
   USER_PROFILE: "diyelectronics_user_profile",
@@ -6,6 +8,7 @@ const Nt = {
   SAVED_GUIDE_IDS: "diyelectronics_saved_guide_ids",
   THEME_MODE: "diyelectronics_dark_mode",
   APP_THEME: "diyelectronics_app_theme",
+  APP_THEME_DEFAULT_V: "diyelectronics_app_theme_default_v",
   VERIFICATION_REQUESTS: "diyelectronics_verification_requests",
   CACHED_FORUM_POSTS: "diyelectronics_forum_posts",
   REPAIR_HISTORY: "diyelectronics_repair_history",
@@ -13,55 +16,34 @@ const Nt = {
   SOCIAL_ANNOTATIONS: "diyelectronics_social_annotations"
 };
 
+// Used only until a real profile is loaded (the app shows the landing page while signed out).
+// No invented person or stats: every counter starts at zero.
 const wl: UserProfile = {
-  id: "tech_usr_102",
-  name: "Alex Vance",
-  email: "alex.vance@diyelectronics.org",
-  phoneNumber: "+1 (555) 382-9012",
-  authProvider: "google",
-  avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-  role: "Technician",
+  id: "signed_out",
+  name: "Guest",
+  email: "",
+  authProvider: "none",
+  avatar: DEFAULT_AVATAR,
+  role: "Guest",
   isVerifiedTrader: false,
-  reputationPoints: 1420,
-  experiencePoints: 3850,
-  repairsCompleted: 27,
-  eWasteDivertedKg: 64.8,
-  co2SavedKg: 182.4,
-  coursesEnrolled: ["course_1", "course_2"],
-  completedCourseIds: ["course_1"],
-  savedGuideIds: ["guide_1", "guide_3"],
-  badges: [
-    {
-      id: "badge_1",
-      name: "Soldering Novice",
-      icon: "Flame",
-      description: "Completed 5 successful board repairs",
-      unlockedAt: "2026-08-10"
-    },
-    {
-      id: "badge_2",
-      name: "E-Waste Champion",
-      icon: "Leaf",
-      description: "Diverted over 50kg of electronics from landfills",
-      unlockedAt: "2026-09-02"
-    },
-    {
-      id: "badge_3",
-      name: "Diagnostic Hawk",
-      icon: "Search",
-      description: "Used AI diagnostic tool to trace 10 component faults",
-      unlockedAt: "2026-09-12"
-    }
-  ]
+  reputationPoints: 0,
+  experiencePoints: 0,
+  repairsCompleted: 0,
+  eWasteDivertedKg: 0,
+  co2SavedKg: 0,
+  coursesEnrolled: [],
+  completedCourseIds: [],
+  savedGuideIds: [],
+  badges: []
 };
 
 export const storage = {
   getUserProfile() {
     try {
       const u = localStorage.getItem(Nt.USER_PROFILE);
-      return u ? JSON.parse(u) : wl;
+      return u ? { ...wl, ...JSON.parse(u) } : { ...wl };
     } catch {
-      return wl;
+      return { ...wl };
     }
   },
   saveUserProfile(u: any) {
@@ -74,9 +56,9 @@ export const storage = {
   getSavedGuideIds() {
     try {
       const u = localStorage.getItem(Nt.SAVED_GUIDE_IDS);
-      return u ? JSON.parse(u) : ["guide_1", "guide_3"];
+      return u ? JSON.parse(u) : [];
     } catch {
-      return ["guide_1", "guide_3"];
+      return [];
     }
   },
   toggleSaveGuide(u: string) {
@@ -153,14 +135,21 @@ export const storage = {
   },
   getAppTheme(): string {
     try {
+      // One-time migration: when "Circuit Mint" became the default, move everyone
+      // onto it once. Any theme picked after that is kept as normal.
+      if (!localStorage.getItem(Nt.APP_THEME_DEFAULT_V)) {
+        localStorage.setItem(Nt.APP_THEME_DEFAULT_V, DEFAULT_THEME_ID);
+        localStorage.setItem(Nt.APP_THEME, JSON.stringify(DEFAULT_THEME_ID));
+        return DEFAULT_THEME_ID;
+      }
       const u = localStorage.getItem(Nt.APP_THEME);
       if (u) {
         const parsed = JSON.parse(u);
-        return parsed === 'smart-formal' ? 'amber-workshop' : parsed;
+        return APP_THEMES[parsed] ? parsed : DEFAULT_THEME_ID;
       }
-      return 'amber-workshop';
+      return DEFAULT_THEME_ID;
     } catch {
-      return 'amber-workshop';
+      return DEFAULT_THEME_ID;
     }
   },
   setAppTheme(theme: string) {
@@ -188,6 +177,9 @@ export const storage = {
   clearSession() {
     try {
       localStorage.setItem(Nt.IS_AUTHENTICATED, JSON.stringify(false));
+      // Don't leave the signed-out (or guest) user's profile or session clock behind.
+      localStorage.removeItem(Nt.USER_PROFILE);
+      localStorage.removeItem("diyelectronics_session_started_at");
     } catch (u) {
       console.warn(u);
     }

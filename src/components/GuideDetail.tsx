@@ -5,6 +5,8 @@ import {
   Volume2
 } from 'lucide-react';
 import VideoTutorial from './VideoTutorial';
+import AiProTipsPanel from './AiProTipsPanel';
+import GuideVideoTutorialTab from './GuideVideoTutorialTab';
 import { useBenchSpeech, playBenchBeep, speakBenchText } from '../hooks/useBenchSpeech';
 import HandsFreeBenchHUD from './HandsFreeBenchHUD';
 import type { Guide } from '../types';
@@ -26,6 +28,7 @@ export default function GuideDetail({
 }) {
   const [activeStepIdx, setActiveStepIdx] = useState(0);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [showAiWalkthrough, setShowAiWalkthrough] = useState(false);
   const [multimeterChecked, setMultimeterChecked] = useState<boolean | null>(null);
   const [repairLogged, setRepairLogged] = useState(false);
 
@@ -262,22 +265,56 @@ export default function GuideDetail({
                   </div>
                 </div>
               )}
+
+              <AiProTipsPanel
+                deviceModel={guide.deviceModel}
+                deviceCategory={guide.deviceCategory}
+                issueType={guide.issueType}
+              />
             </div>
 
             <div className="lg:col-span-8 space-y-6">
-              {isVideoPlaying ? (
+              {guide.videoUrl && isVideoPlaying ? (
                 <div className="rounded-2xl overflow-hidden aspect-video relative bg-stone-950 border border-stone-800">
                   <VideoTutorial videoUrl={guide.videoUrl} onClose={() => setIsVideoPlaying(false)} />
                 </div>
+              ) : guide.videoUrl ? (
+                <div className="rounded-2xl overflow-hidden aspect-video relative bg-stone-950 border border-stone-800 flex flex-col items-center justify-center p-6 text-center space-y-3">
+                  <img src={guide.thumbnailUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40 filter blur-xs" />
+                  <button
+                    type="button"
+                    onClick={() => setIsVideoPlaying(true)}
+                    aria-label="Play guide video"
+                    className="relative z-10 w-14 h-14 rounded-full bg-amber-400 hover:scale-105 active:scale-95 transition-all text-stone-950 flex items-center justify-center shadow-lg"
+                  >
+                    <svg className="w-6 h-6 fill-current pl-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4 4l12 6-12 6V4z"/></svg>
+                  </button>
+                  <span className="relative z-10 text-xs text-stone-200 font-bold">Watch guide video</span>
+                </div>
               ) : (
                 <div className="rounded-2xl overflow-hidden aspect-video relative bg-stone-950 border border-stone-800 flex flex-col items-center justify-center p-6 text-center space-y-3">
-                  <img src={guide.thumbnailUrl} alt="Video thumbnail" className="absolute inset-0 w-full h-full object-cover opacity-40 filter blur-xs" />
-                  <div className="relative z-10 w-14 h-14 rounded-full bg-amber-400 hover:scale-105 active:scale-95 transition-all text-stone-950 flex items-center justify-center cursor-pointer shadow-lg" onClick={() => setIsVideoPlaying(true)}>
-                    <svg className="w-6 h-6 fill-current pl-1" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4l12 6-12 6V4z"/></svg>
-                  </div>
-                  <span className="relative z-10 text-xs text-stone-200 font-bold">Watch Official Bench Walkthrough Video</span>
+                  <img src={guide.thumbnailUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40 filter blur-xs" />
+                  <a
+                    href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`${guide.deviceModel} ${guide.issueType || guide.title} repair`.slice(0, 200))}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="relative z-10 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-lg transition-colors"
+                  >
+                    <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4l12 6-12 6V4z"/></svg>
+                    <span>Find repair videos on YouTube</span>
+                  </a>
+                  <span className="relative z-10 text-[11px] text-stone-300">We don't host a video for this guide yet. This opens a YouTube search.</span>
                 </div>
               )}
+
+              <button
+                type="button"
+                onClick={() => setShowAiWalkthrough(v => !v)}
+                className="w-full px-4 py-2.5 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-xs font-bold transition-colors hover:bg-amber-100 dark:hover:bg-amber-900/50"
+              >
+                {showAiWalkthrough ? 'Hide AI Chaptered Walkthrough' : 'Show AI Chaptered Walkthrough'}
+              </button>
+              {showAiWalkthrough && <GuideVideoTutorialTab guide={guide} />}
 
               <div className="p-5 sm:p-6 rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 space-y-4">
                 <div className="flex justify-between items-center pb-2.5 border-b border-stone-100 dark:border-stone-800">

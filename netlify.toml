@@ -1,0 +1,31 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+# Firebase web config is public by design (it ships in the browser bundle), so it can live here.
+# Secrets like GEMINI_API_KEY must NOT go here: set them in Netlify > Site configuration > Environment variables.
+[build.environment]
+  VITE_FIREBASE_API_KEY = "AIzaSyAVRIBDhL7FGAWX7lW9j5BkSx3nSvp_-EU"
+  VITE_FIREBASE_AUTH_DOMAIN = "diy-electronic.firebaseapp.com"
+  VITE_FIREBASE_PROJECT_ID = "diy-electronic"
+  VITE_FIREBASE_STORAGE_BUCKET = "diy-electronic.firebasestorage.app"
+  VITE_FIREBASE_MESSAGING_SENDER_ID = "592657838678"
+  VITE_FIREBASE_APP_ID = "1:592657838678:web:c6be14f2d8dce308f301f7"
+  VITE_FIREBASE_DATABASE_ID = "ai-studio-diyelectronicswe-b1d78eb7-12c8-4870-842e-525f3094f897"
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["vite"]
+
+# Send API calls to the serverless Express app
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+# SPA fallback so deep links like /devices/tv/samsung load on refresh
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

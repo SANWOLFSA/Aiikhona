@@ -1,7 +1,32 @@
 rules_version = '2';
+
+// =====================================================================
+// DIY Electronics — Cloud Firestore Security Rules
+//
+// There is NO catch-all rule. Every collection the app uses has its own
+// match block below; anything not listed is denied by default.
+//
+// Sections (kept as separate, commented blocks so branches merge cleanly):
+//   1. Shared helpers (isSignedIn / isOwner / isAdmin)
+//   2. Users & admins
+//   3. Existing per-user collections (files, metadata, saved devices)
+//   4. App content & analytics (searchLogs, repairTricks, blueprints, devices)
+//   5. Marketplace: sellers, seller verification, verified badge, listings,
+//      purchase requests, reviews, admin audit log
+//   6. Community repair videos (communityVideos, helpful marks, videoReports)
+//   7. Repair hub: guides, guideCompletions, guideComments, questions, answers,
+//      questionVotes, answerVotes, discoveredDevices, discoveredComponents,
+//      deviceRequests
+//   (Community `posts` / comments are defined on the home-community branch;
+//    they are intentionally NOT defined here.)
+// =====================================================================
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // -----------------------------------------------------------------
+    // 1. Shared helpers
+    // -----------------------------------------------------------------
     function isSignedIn() {
       return request.auth != null;
     }
@@ -10,10 +35,72 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    match /users/{userId} {
-      allow read, write: if isOwner(userId);
+    // Real admin authority. A user is an admin when ANY of these is true:
+    //   - Auth custom claim  admin == true   (set with the Admin SDK), or
+    //   - a document exists at  admins/{uid}  (create it in the Firebase console), or
+    //   - users/{uid}.role == 'admin'        (lower-case; set in the console).
+    // Users can never write any of these themselves (see blocks below).
+    // VITE_ADMIN_EMAILS in the client only controls what UI is shown.
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.admin == true
+        || exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        || (exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin')
+      );
     }
 
+    function isTrimmedString(v, maxLen) {
+      return v is string && v.size() <= maxLen;
+    }
+
+    function isNonEmptyString(v, maxLen) {
+      return v is string && v.size() > 0 && v.size() <= maxLen;
+    }
+
+    // -----------------------------------------------------------------
+    // 2. Users & admins
+    // -----------------------------------------------------------------
+
+    // Admin roster. Read-only from the client (a user may check their own
+    // entry). Add/remove admins in the Firebase console only.
+    match /admins/{uid} {
+      allow get: if isOwner(uid) || isAdmin();
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    match /users/{userId} {
+      // Fields a user may never set or change on their own profile.
+      function privilegedUserFields() {
+        return ['role', 'isAdmin', 'isVerifiedTrader', 'isVerifiedCompany'];
+      }
+
+      function roleIsNotAdmin(d) {
+        return !('role' in d) || !(d.role is string) || d.role.lower() != 'admin';
+      }
+
+      allow read: if isOwner(userId) || isAdmin();
+
+      // On sign-up a user may pick a normal role (e.g. "Technician"), but not
+      // any spelling of "admin", and may not mark themselves verified.
+      allow create: if isOwner(userId)
+        && roleIsNotAdmin(request.resource.data)
+        && request.resource.data.get('isAdmin', false) == false
+        && request.resource.data.get('isVerifiedTrader', false) == false
+        && request.resource.data.get('isVerifiedCompany', false) == false;
+
+      // Owners can edit their profile but not role / admin / verification flags.
+      allow update: if (isOwner(userId)
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(privilegedUserFields()))
+        || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    // -----------------------------------------------------------------
+    // 3. Existing per-user collections (unchanged behaviour, owner only)
+    // -----------------------------------------------------------------
     match /user_metadata_uploads/{recordId} {
       allow read, write: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid) && (request.resource == null || request.resource.data.userId == request.auth.uid);
     }
@@ -22,8 +109,1010 @@ service cloud.firestore {
       allow read, write: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid) && (request.resource == null || request.resource.data.userId == request.auth.uid);
     }
 
-    match /{document=**} {
-      allow read, write: if true;
+    match /user_saved_devices/{deviceId} {
+      allow read, write: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid) && (request.resource == null || request.resource.data.userId == request.auth.uid);
     }
+
+    // -----------------------------------------------------------------
+    // 4. App content & analytics
+    // -----------------------------------------------------------------
+
+    // Search analytics: anyone may append a log entry; only admins read it.
+    match /searchLogs/{logId} {
+      allow create: if isNonEmptyString(request.resource.data.query, 200)
+        && request.resource.data.resultsCount is int
+        && isNonEmptyString(request.resource.data.userId, 128);
+      allow read, delete: if isAdmin();
+      allow update: if false;
+    }
+
+    // Cached AI repair tricks: public read; signed-in users may add a new
+    // cache entry (never overwrite); admins moderate.
+    match /repairTricks/{trickId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && isTrimmedString(request.resource.data.get('content', ''), 20000);
+      allow update, delete: if isAdmin();
+    }
+
+    // Blueprints saved from AI search: write-only for signed-in users, admins read.
+    match /savedBlueprints/{blueprintId} {
+      allow create: if isSignedIn()
+        && isTrimmedString(request.resource.data.get('blueprintData', ''), 50000);
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Device catalogue additions (universal device pages): see section 7c.
+
+    // -----------------------------------------------------------------
+    // 5. Marketplace
+    //
+    //   sellers/{uid}                 public seller profile (individual | company)
+    //   sellerVerifications/{uid}     company verification application (PRIVATE:
+    //                                 owner + admins). Status flow:
+    //                                 draft -> submitted -> under_review ->
+    //                                 approved | rejected (reason) ; approved -> revoked
+    //                                 rejected/revoked -> owner can resubmit
+    //   verifiedSellers/{uid}         public "verified" badge. Admin-only, and
+    //                                 only while sellerVerifications/{uid}.status
+    //                                 == 'approved' (checked with getAfter).
+    //   listings/{listingId}          items for sale (pending | active | removed)
+    //   purchaseRequests/{requestId}  "Request to buy" (no payments)
+    //   reviews/{requestId}           1 review per accepted/completed request
+    //   adminAuditLog/{entryId}       append-only admin actions (who / when)
+    // -----------------------------------------------------------------
+
+    function isVerifiedSeller(uid) {
+      return exists(/databases/$(database)/documents/verifiedSellers/$(uid));
+    }
+
+    // Categories only APPROVED companies may list in (must match
+    // BUSINESS_CATEGORIES in src/lib/marketplace.ts).
+    function isBusinessCategory(c) {
+      return c in ['Bulk & Wholesale', 'New Stock (Business)'];
+    }
+
+    // --- 5a. Public seller profile ------------------------------------
+    match /sellers/{uid} {
+      function validSeller(d) {
+        return d.uid == uid
+          && d.sellerType in ['individual', 'company']
+          && isNonEmptyString(d.displayName, 80)
+          && isTrimmedString(d.get('location', ''), 80)
+          && isTrimmedString(d.get('bio', ''), 600);
+      }
+
+      allow read: if true;
+      allow create, update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['uid', 'displayName', 'sellerType', 'location', 'bio', 'createdAt', 'updatedAt'])
+        && validSeller(request.resource.data);
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // --- 5b. Company verification application -------------------------
+    match /sellerVerifications/{uid} {
+      function ownerFields() {
+        return ['uid', 'companyName', 'registrationNumber', 'vatNumber', 'country',
+                'address', 'contactName', 'contactEmail', 'contactPhone',
+                'documents', 'status', 'createdAt', 'updatedAt', 'submittedAt',
+                'submissionCount'];
+      }
+
+      function adminFields() {
+        return ['status', 'checklist', 'reviewedAt', 'reviewedBy', 'reviewerEmail',
+                'rejectionReason', 'approvedAt', 'revokedAt', 'updatedAt'];
+      }
+
+      function validApplication(d) {
+        return d.uid == uid
+          && isTrimmedString(d.companyName, 160)
+          && isTrimmedString(d.registrationNumber, 60)
+          && isTrimmedString(d.vatNumber, 40)
+          && isTrimmedString(d.country, 60)
+          && isTrimmedString(d.address, 400)
+          && isTrimmedString(d.contactName, 120)
+          && isTrimmedString(d.contactEmail, 160)
+          && isTrimmedString(d.contactPhone, 40)
+          && d.documents is map
+          && d.documents.size() <= 10;
+      }
+
+      // A submission must carry the core company details and the four
+      // required documents (uploaded to Storage under sellerDocs/{uid}/...).
+      function completeSubmission(d) {
+        return d.companyName.size() > 1
+          && d.registrationNumber.size() > 3
+          && d.address.size() > 5
+          && d.contactEmail.size() > 3
+          && d.documents.keys().hasAll(['registrationCertificate', 'taxClearance', 'proofOfAddress', 'directorId']);
+      }
+
+      function ownerStatusOk(d) {
+        return d.status == 'draft' || (d.status == 'submitted' && completeSubmission(d));
+      }
+
+      allow read: if isOwner(uid) || isAdmin();
+
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(ownerFields())
+        && validApplication(request.resource.data)
+        && ownerStatusOk(request.resource.data);
+
+      // Owner: may edit/submit only while NOT approved and NOT under review,
+      // and only the submission fields (never status beyond submitted, never
+      // the reviewer fields or the rejection reason).
+      // Admin: may only touch review fields and move the status.
+      allow update: if (isOwner(uid)
+          && resource.data.status in ['draft', 'submitted', 'rejected', 'revoked']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(ownerFields())
+          && validApplication(request.resource.data)
+          && ownerStatusOk(request.resource.data))
+        || (isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(adminFields())
+          && request.resource.data.status in ['under_review', 'approved', 'rejected', 'revoked']
+          && (!(request.resource.data.status in ['rejected', 'revoked'])
+              || isNonEmptyString(request.resource.data.rejectionReason, 1000)));
+
+      allow delete: if (isOwner(uid) && resource.data.status == 'draft') || isAdmin();
+    }
+
+    // --- 5c. Public verified badge -------------------------------------
+    match /verifiedSellers/{uid} {
+      allow read: if true;
+      // Written by an admin in the SAME batch that sets status 'approved'.
+      allow create, update: if isAdmin()
+        && getAfter(/databases/$(database)/documents/sellerVerifications/$(uid)).data.status == 'approved'
+        && request.resource.data.uid == uid
+        && isNonEmptyString(request.resource.data.companyName, 160);
+      allow delete: if isAdmin();
+    }
+
+    // --- 5d. Listings --------------------------------------------------
+    match /listings/{listingId} {
+      function listingFields() {
+        return ['sellerUid', 'sellerName', 'sellerType', 'title', 'category', 'price',
+                'currency', 'condition', 'description', 'imageUrl', 'imagePath',
+                'inStock', 'status', 'createdAt', 'updatedAt'];
+      }
+
+      function ownerEditableFields() {
+        return ['sellerName', 'sellerType', 'title', 'category', 'price', 'condition',
+                'description', 'imageUrl', 'imagePath', 'inStock', 'status', 'updatedAt'];
+      }
+
+      function validListing(d) {
+        return isNonEmptyString(d.title, 140)
+          && isNonEmptyString(d.category, 60)
+          && (d.price is int || d.price is float) && d.price >= 0 && d.price <= 10000000
+          && d.currency == 'ZAR'
+          && isNonEmptyString(d.condition, 60)
+          && isTrimmedString(d.description, 4000)
+          && isTrimmedString(d.imageUrl, 2000)
+          && isTrimmedString(d.imagePath, 400)
+          && d.inStock is bool
+          && d.sellerType in ['individual', 'company']
+          && isNonEmptyString(d.sellerName, 80)
+          && (!isBusinessCategory(d.category) || isVerifiedSeller(request.auth.uid));
+      }
+
+      // Verified companies publish straight away; everyone else waits for
+      // admin approval ('pending').
+      function allowedOwnerStatus(d) {
+        return d.status == 'pending' || (d.status == 'active' && isVerifiedSeller(request.auth.uid));
+      }
+
+      allow read: if resource.data.status == 'active'
+        || (isSignedIn() && resource.data.sellerUid == request.auth.uid)
+        || isAdmin();
+
+      allow create: if isSignedIn()
+        && request.resource.data.sellerUid == request.auth.uid
+        && request.resource.data.keys().hasOnly(listingFields())
+        && validListing(request.resource.data)
+        && allowedOwnerStatus(request.resource.data);
+
+      allow update: if
+        // Owner toggles stock only: no re-review needed.
+        (isSignedIn() && resource.data.sellerUid == request.auth.uid
+          && resource.data.status != 'removed'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['inStock', 'updatedAt'])
+          && request.resource.data.inStock is bool)
+        // Owner edits content: goes back to review unless verified company.
+        || (isSignedIn() && resource.data.sellerUid == request.auth.uid
+          && resource.data.status != 'removed'
+          && request.resource.data.sellerUid == resource.data.sellerUid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(ownerEditableFields())
+          && validListing(request.resource.data)
+          && allowedOwnerStatus(request.resource.data))
+        // Admin moderation.
+        || (isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'moderatedBy', 'moderatedAt', 'moderationReason', 'updatedAt'])
+          && request.resource.data.status in ['pending', 'active', 'removed']);
+
+      allow delete: if (isSignedIn() && resource.data.sellerUid == request.auth.uid) || isAdmin();
+    }
+
+    // --- 5e. Request to buy (no payments) ------------------------------
+    match /purchaseRequests/{requestId} {
+      allow read: if isSignedIn() && (resource.data.buyerUid == request.auth.uid
+        || resource.data.sellerUid == request.auth.uid
+        || isAdmin());
+
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['listingId', 'listingTitle', 'price', 'currency', 'sellerUid',
+              'buyerUid', 'buyerName', 'buyerContact', 'message', 'status', 'sellerReply', 'createdAt', 'updatedAt'])
+        && request.resource.data.buyerUid == request.auth.uid
+        && request.resource.data.sellerUid != request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.sellerReply == ''
+        && isNonEmptyString(request.resource.data.message, 2000)
+        && isNonEmptyString(request.resource.data.buyerContact, 200)
+        && isNonEmptyString(request.resource.data.buyerName, 80)
+        && get(/databases/$(database)/documents/listings/$(request.resource.data.listingId)).data.status == 'active'
+        && get(/databases/$(database)/documents/listings/$(request.resource.data.listingId)).data.sellerUid == request.resource.data.sellerUid;
+
+      allow update: if isSignedIn() && (
+        // Seller responds.
+        (resource.data.sellerUid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'sellerReply', 'updatedAt'])
+          && request.resource.data.status in ['pending', 'accepted', 'declined', 'completed']
+          && isTrimmedString(request.resource.data.sellerReply, 2000))
+        // Buyer cancels.
+        || (resource.data.buyerUid == request.auth.uid
+          && resource.data.status in ['pending', 'accepted']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+          && request.resource.data.status == 'cancelled')
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // --- 5f. Reviews: only from a buyer whose request was accepted -----
+    match /reviews/{requestId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['requestId', 'listingId', 'sellerUid', 'reviewerUid', 'reviewerName', 'rating', 'comment', 'createdAt'])
+        && request.resource.data.requestId == requestId
+        && request.resource.data.reviewerUid == request.auth.uid
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+        && isTrimmedString(request.resource.data.comment, 1000)
+        && isNonEmptyString(request.resource.data.reviewerName, 80)
+        && get(/databases/$(database)/documents/purchaseRequests/$(requestId)).data.buyerUid == request.auth.uid
+        && get(/databases/$(database)/documents/purchaseRequests/$(requestId)).data.sellerUid == request.resource.data.sellerUid
+        && get(/databases/$(database)/documents/purchaseRequests/$(requestId)).data.listingId == request.resource.data.listingId
+        && get(/databases/$(database)/documents/purchaseRequests/$(requestId)).data.status in ['accepted', 'completed'];
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // --- 5g. Admin audit log (append-only) -----------------------------
+    match /adminAuditLog/{entryId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.at == request.time
+        && isNonEmptyString(request.resource.data.action, 60)
+        && isNonEmptyString(request.resource.data.targetType, 40)
+        && isNonEmptyString(request.resource.data.targetId, 200);
+      allow update, delete: if false;
+    }
+  
+    // --- Community posts (home-community) ---------------------------
+    // ---------------------------------------------------------------
+    // Home community feed
+    //   posts/{postId}                      likes = `likedBy` array of uids
+    //   posts/{postId}/comments/{commentId} replies use `parentId`
+    // ---------------------------------------------------------------
+    match /posts/{postId} {
+      function validPostShape(d) {
+        return d.title is string && d.title.size() > 0 && d.title.size() <= 140
+          && d.content is string && d.content.size() > 0 && d.content.size() <= 5000
+          && (d.imageUrl == null || (d.imageUrl is string && d.imageUrl.size() < 900000))
+          && d.deviceCategory is string && d.deviceCategory.size() <= 60
+          && d.brand is string && d.brand.size() <= 40
+          && d.deviceModel is string && d.deviceModel.size() <= 60
+          && d.tags is list && d.tags.size() <= 10
+          && d.likedBy is list
+          && d.commentCount is int
+          && d.isSolved is bool;
+      }
+
+      // Like / unlike: only your own uid may be added or removed, nothing else changes.
+      function isOwnLikeToggle() {
+        let before = resource.data.likedBy.toSet();
+        let after = request.resource.data.likedBy.toSet();
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likedBy'])
+          && (after.difference(before) == [request.auth.uid].toSet() && before.difference(after).size() == 0
+              || before.difference(after) == [request.auth.uid].toSet() && after.difference(before).size() == 0);
+      }
+
+      // Comment counter kept in sync (batched with the comment create/delete): +/-1 only.
+      function isCommentCountBump() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentCount'])
+          && (request.resource.data.commentCount == resource.data.commentCount + 1
+              || request.resource.data.commentCount == resource.data.commentCount - 1);
+      }
+
+      allow read: if true;
+
+      allow create: if isSignedIn()
+        && request.resource.data.authorUid == request.auth.uid
+        && validPostShape(request.resource.data)
+        && request.resource.data.likedBy.size() == 0
+        && request.resource.data.commentCount == 0
+        && request.resource.data.isSolved == false;
+
+      // Author: edit own post (not the likes, counter or authorship).
+      allow update: if isSignedIn() && (
+        (resource.data.authorUid == request.auth.uid
+          && request.resource.data.authorUid == resource.data.authorUid
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['title', 'content', 'imageUrl', 'deviceCategory', 'brand', 'deviceModel', 'tags', 'isSolved', 'solvedCommentId', 'updatedAt'])
+          && validPostShape(request.resource.data))
+        || isOwnLikeToggle()
+        || isCommentCountBump()
+      );
+
+      allow delete: if isSignedIn() && resource.data.authorUid == request.auth.uid;
+
+      match /comments/{commentId} {
+        function postAuthor() {
+          return get(/databases/$(database)/documents/posts/$(postId)).data.authorUid;
+        }
+
+        allow read: if true;
+
+        allow create: if isSignedIn()
+          && exists(/databases/$(database)/documents/posts/$(postId))
+          && request.resource.data.authorUid == request.auth.uid
+          && request.resource.data.content is string
+          && request.resource.data.content.size() > 0
+          && request.resource.data.content.size() <= 3000
+          && (request.resource.data.parentId == null || request.resource.data.parentId is string)
+          && request.resource.data.isHelpful == false;
+
+        // Comment author may edit their text; the post author may only toggle isHelpful.
+        allow update: if isSignedIn() && (
+          (resource.data.authorUid == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'updatedAt'])
+            && request.resource.data.content is string
+            && request.resource.data.content.size() > 0
+            && request.resource.data.content.size() <= 3000)
+          || (postAuthor() == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isHelpful'])
+            && request.resource.data.isHelpful is bool)
+        );
+
+        allow delete: if isSignedIn() && resource.data.authorUid == request.auth.uid;
+      }
+    }
+
+
+    // -----------------------------------------------------------------
+    // 6. Community repair videos (src/lib/communityVideos.ts)
+    //
+    //   communityVideos/{videoId}                video keyed to catalog slugs
+    //                                            (deviceType/brand/model[/size])
+    //   communityVideos/{videoId}/helpful/{uid}  one "Helpful" mark per user
+    //   videoReports/{videoId}_{uid}             one report per user, admin read
+    //
+    // Uploaded files live in Storage at communityVideos/{uid}/{videoId}/{file}
+    // (see storage.rules). Links are stored as privacy-friendly embed URLs.
+    // -----------------------------------------------------------------
+    match /communityVideos/{videoId} {
+      function videoFields() {
+        return ['deviceType', 'brand', 'model', 'size', 'solutionId', 'solutionTitle',
+                'deviceLabel', 'pagePath', 'title', 'description', 'kind', 'storagePath',
+                'url', 'thumbnailUrl', 'ownerUid', 'ownerName', 'ownerPhoto',
+                'createdAt', 'updatedAt', 'helpfulCount', 'reportCount', 'status'];
+      }
+
+      function validSource(d) {
+        return (d.kind == 'upload'
+            && d.storagePath is string
+            && d.storagePath.matches('communityVideos/' + request.auth.uid + '/' + videoId + '/[^/]{1,100}')
+            && d.url.matches('https://firebasestorage[.]googleapis[.]com/.*'))
+          || (d.kind == 'youtube'
+            && !('storagePath' in d)
+            && d.url.matches('https://www[.]youtube-nocookie[.]com/embed/[A-Za-z0-9_-]{11}([?].*)?'))
+          || (d.kind == 'vimeo'
+            && !('storagePath' in d)
+            && d.url.matches('https://player[.]vimeo[.]com/video/[0-9]{4,12}([?].*)?'));
+      }
+
+      function validVideo(d) {
+        return isNonEmptyString(d.deviceType, 80)
+          && isNonEmptyString(d.brand, 80)
+          && isNonEmptyString(d.model, 160)
+          && isTrimmedString(d.get('size', ''), 80)
+          && isTrimmedString(d.get('solutionId', ''), 120)
+          && isTrimmedString(d.get('solutionTitle', ''), 200)
+          && isNonEmptyString(d.deviceLabel, 200)
+          && isNonEmptyString(d.pagePath, 400)
+          && isNonEmptyString(d.title, 140)
+          && isTrimmedString(d.description, 2000)
+          && d.url is string && d.url.size() <= 1000
+          && isTrimmedString(d.get('thumbnailUrl', ''), 500)
+          && isNonEmptyString(d.ownerName, 80)
+          && isTrimmedString(d.get('ownerPhoto', ''), 1000);
+      }
+
+      function reportPath() {
+        return /databases/$(database)/documents/videoReports/$(videoId + '_' + request.auth.uid);
+      }
+
+      function helpfulPath() {
+        return /databases/$(database)/documents/communityVideos/$(videoId)/helpful/$(request.auth.uid);
+      }
+
+      // Helpful counter: +1 only together with creating your helpful/{uid}
+      // doc, -1 only together with deleting it (same batch).
+      function isHelpfulBump() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['helpfulCount'])
+          && resource.data.status == 'published'
+          && ((request.resource.data.helpfulCount == resource.data.helpfulCount + 1
+                && !exists(helpfulPath()) && existsAfter(helpfulPath()))
+            || (request.resource.data.helpfulCount == resource.data.helpfulCount - 1
+                && exists(helpfulPath()) && !existsAfter(helpfulPath())));
+      }
+
+      // Report counter: +1 only together with creating your one report doc.
+      function isReportBump() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount'])
+          && request.resource.data.reportCount == resource.data.reportCount + 1
+          && !exists(reportPath()) && existsAfter(reportPath());
+      }
+
+      allow read: if resource.data.status == 'published'
+        || (isSignedIn() && resource.data.ownerUid == request.auth.uid)
+        || isAdmin();
+
+      allow create: if isSignedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.keys().hasOnly(videoFields())
+        && request.resource.data.keys().hasAll(['deviceType', 'brand', 'model', 'deviceLabel', 'pagePath',
+              'title', 'description', 'kind', 'url', 'ownerUid', 'ownerName', 'createdAt', 'updatedAt',
+              'helpfulCount', 'reportCount', 'status'])
+        && request.resource.data.status == 'published'
+        && request.resource.data.helpfulCount == 0
+        && request.resource.data.reportCount == 0
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && validVideo(request.resource.data)
+        && validSource(request.resource.data);
+
+      allow update: if
+        // Owner edits the text of a live video (never the source, owner or counters).
+        (isSignedIn() && resource.data.ownerUid == request.auth.uid
+          && resource.data.status == 'published'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'description', 'solutionId', 'solutionTitle', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time
+          && validVideo(request.resource.data))
+        // Admin moderation (hide / restore).
+        || (isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'moderatedBy', 'moderatedAt', 'moderationReason', 'updatedAt'])
+          && request.resource.data.status in ['published', 'removed']
+          && isTrimmedString(request.resource.data.get('moderationReason', ''), 1000))
+        || (isSignedIn() && isHelpfulBump())
+        || (isSignedIn() && isReportBump());
+
+      allow delete: if (isSignedIn() && resource.data.ownerUid == request.auth.uid) || isAdmin();
+
+      match /helpful/{uid} {
+        allow get: if isOwner(uid);
+        allow list: if isAdmin();
+        allow create: if isOwner(uid)
+          && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
+          && request.resource.data.uid == uid
+          && request.resource.data.createdAt == request.time
+          && get(/databases/$(database)/documents/communityVideos/$(videoId)).data.status == 'published';
+        allow update: if false;
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+    }
+
+    match /videoReports/{reportId} {
+      allow get: if isAdmin() || (isSignedIn() && resource.data.reporterUid == request.auth.uid);
+      allow list: if isAdmin();
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['videoId', 'reporterUid', 'reason', 'createdAt'])
+        && request.resource.data.reporterUid == request.auth.uid
+        && reportId == request.resource.data.videoId + '_' + request.auth.uid
+        && isNonEmptyString(request.resource.data.reason, 500)
+        && request.resource.data.createdAt == request.time
+        && exists(/databases/$(database)/documents/communityVideos/$(request.resource.data.videoId));
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // =================================================================
+    // Real PCB boards (community board photos + schematic/boardview files)
+    //   boards/{boardId}                 aggregate per normalized board number
+    //   boards/{boardId}/photos/{id}     Storage boardPhotos/{uid}/{boardId}/...
+    //   boards/{boardId}/files/{id}      Storage boardFiles/{uid}/{boardId}/...
+    // boardId = normalizeBoardNumber() in src/lib/boards.ts.
+    // =================================================================
+    function isBoardId(id) {
+      return id.matches('^[A-Z0-9][A-Z0-9._-]{1,63}$');
+    }
+
+    function isStorageDownloadUrl(v) {
+      return v is string && v.size() <= 2000
+        && v.matches('^https://firebasestorage[.]googleapis[.]com/.*');
+    }
+
+    match /boards/{boardId} {
+      function validBoardCreate(d) {
+        return d.keys().hasOnly(['number', 'displayNumber', 'manufacturer', 'devices', 'photoCount', 'coverUrl', 'createdByUid', 'createdAt', 'updatedAt'])
+          && d.number == boardId
+          && isNonEmptyString(d.displayNumber, 80)
+          && isTrimmedString(d.manufacturer, 80)
+          && d.devices is list && d.devices.size() <= 20
+          && d.photoCount is int && (d.photoCount == 0 || d.photoCount == 1)
+          && (d.coverUrl == '' || isStorageDownloadUrl(d.coverUrl))
+          && d.createdByUid == request.auth.uid
+          && d.createdAt == request.time
+          && d.updatedAt == request.time;
+      }
+
+      // Any signed-in uploader may move the counter by exactly +/-1 (batched with the
+      // photo create/delete) and set the cover once if it is empty.
+      function isCounterBump() {
+        let keys = request.resource.data.diff(resource.data).affectedKeys();
+        return keys.hasOnly(['photoCount', 'updatedAt', 'coverUrl'])
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.photoCount is int
+          && (request.resource.data.photoCount == resource.data.photoCount
+              || request.resource.data.photoCount == resource.data.photoCount + 1
+              || request.resource.data.photoCount == resource.data.photoCount - 1)
+          && (!keys.hasAny(['coverUrl'])
+              || (resource.data.coverUrl == '' && isStorageDownloadUrl(request.resource.data.coverUrl)));
+      }
+
+      allow read: if true;
+      allow create: if isSignedIn() && isBoardId(boardId) && validBoardCreate(request.resource.data);
+      allow update: if isSignedIn() && (isCounterBump() || isAdmin());
+      allow delete: if isAdmin();
+
+      match /photos/{photoId} {
+        function validPhoto(d) {
+          return d.keys().hasOnly(['ownerUid', 'ownerName', 'url', 'storagePath', 'side', 'caption', 'title', 'device', 'brand', 'model', 'notes', 'contentType', 'size', 'createdAt'])
+            && d.ownerUid == request.auth.uid
+            && isNonEmptyString(d.ownerName, 80)
+            && isStorageDownloadUrl(d.url)
+            && d.storagePath is string
+            && d.storagePath.matches('^boardPhotos/' + request.auth.uid + '/' + boardId + '/[^/]{1,120}$')
+            && d.side in ['top', 'bottom', 'other']
+            && isTrimmedString(d.caption, 300)
+            && isTrimmedString(d.title, 120)
+            && isTrimmedString(d.device, 120)
+            && isTrimmedString(d.brand, 60)
+            && isTrimmedString(d.model, 80)
+            && isTrimmedString(d.notes, 2000)
+            && d.contentType in ['image/jpeg', 'image/png', 'image/webp']
+            && d.size is int && d.size > 0 && d.size <= 10 * 1024 * 1024
+            && d.createdAt == request.time;
+        }
+        allow read: if true;
+        allow create: if isSignedIn() && isBoardId(boardId)
+          && existsAfter(/databases/$(database)/documents/boards/$(boardId))
+          && validPhoto(request.resource.data);
+        allow update: if false;
+        allow delete: if isSignedIn() && (resource.data.ownerUid == request.auth.uid || isAdmin());
+      }
+
+      match /files/{fileId} {
+        function validBoardFile(d) {
+          return d.keys().hasOnly(['ownerUid', 'ownerName', 'url', 'storagePath', 'fileName', 'fileKind', 'contentType', 'size', 'title', 'notes', 'createdAt'])
+            && d.ownerUid == request.auth.uid
+            && isNonEmptyString(d.ownerName, 80)
+            && isStorageDownloadUrl(d.url)
+            && d.storagePath is string
+            && d.storagePath.matches('^boardFiles/' + request.auth.uid + '/' + boardId + '/[^/]{1,120}$')
+            && isNonEmptyString(d.fileName, 120)
+            && d.fileKind in ['schematic', 'boardview', 'other']
+            && d.contentType in ['application/pdf', 'application/octet-stream', 'application/zip', 'application/x-zip-compressed']
+            && d.size is int && d.size > 0 && d.size <= 25 * 1024 * 1024
+            && isTrimmedString(d.title, 120)
+            && isTrimmedString(d.notes, 2000)
+            && d.createdAt == request.time;
+        }
+        allow read: if true;
+        allow create: if isSignedIn() && isBoardId(boardId)
+          && existsAfter(/databases/$(database)/documents/boards/$(boardId))
+          && validBoardFile(request.resource.data);
+        allow update: if false;
+        allow delete: if isSignedIn() && (resource.data.ownerUid == request.auth.uid || isAdmin());
+      }
+    }
+    // ===== end Real PCB boards =====
+
+    // =================================================================
+    // 7. Repair hub (src/lib/repairHub.ts): guides, Answers, universal
+    //    device / component pages and device requests.
+    //
+    //   guides/{guideId}                    user guides & teardowns (draft | published | removed)
+    //   guideCompletions/{guideId}_{uid}    "I fixed it" (batched with guides.completedCount)
+    //   guideComments/{commentId}           comment on a guide (stepIndex -1) or a step
+    //   questions/{questionId}              Answers questions (acceptedAnswerId set by the asker)
+    //   answers/{answerId}                  answers (questionId field)
+    //   questionVotes/{questionId}_{uid}    one upvote per user (batched with voteCount)
+    //   answerVotes/{answerId}_{uid}        one upvote per user (batched with voteCount)
+    //   discoveredDevices/{slug}            universal device pages: AI-researched (must cite
+    //                                       sources, published) or hand-added (pending review)
+    //   discoveredComponents/{partId}       universal component pages (AI-researched)
+    //   deviceRequests/{requestId}          "please add this device" (open | done | rejected)
+    //
+    // Images are https links only (no Cloud Storage bucket on this project).
+    // =================================================================
+    function isDeviceKey(v) {
+      return v is string && v.matches('^(cat|dev|gen)~[a-z0-9~-]{1,190}$');
+    }
+
+    function isHttpsLink(v) {
+      return v is string && v.size() <= 1000 && v.matches('^https://.+');
+    }
+
+    function isModerationOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'moderatedBy', 'moderatedAt', 'moderationReason'])
+        && isTrimmedString(request.resource.data.get('moderationReason', ''), 1000);
+    }
+
+    // --- 7a. Guides ---------------------------------------------------
+    match /guides/{guideId} {
+      function guideContentKeys() {
+        return ['title', 'summary', 'kind', 'deviceKey', 'deviceLabel', 'devicePath', 'difficulty', 'minutes',
+                'tools', 'parts', 'steps', 'coverUrl', 'keywords', 'status', 'updatedAt'];
+      }
+
+      function validGuide(d) {
+        return isNonEmptyString(d.title, 140)
+          && isTrimmedString(d.summary, 2000)
+          && d.kind in ['repair', 'replacement', 'teardown', 'technique']
+          && isDeviceKey(d.deviceKey)
+          && isNonEmptyString(d.deviceLabel, 200)
+          && isNonEmptyString(d.devicePath, 400)
+          && d.difficulty in ['Easy', 'Moderate', 'Advanced', 'Expert']
+          && d.minutes is int && d.minutes > 0 && d.minutes <= 10000
+          && d.tools is list && d.tools.size() <= 40
+          && d.parts is list && d.parts.size() <= 40
+          && d.steps is list && d.steps.size() <= 80
+          && (d.status == 'draft' || d.steps.size() > 0)
+          && (d.coverUrl == '' || isHttpsLink(d.coverUrl))
+          && d.keywords is list && d.keywords.size() <= 40
+          && d.status in ['draft', 'published'];
+      }
+
+      function completionPath() {
+        return /databases/$(database)/documents/guideCompletions/$(guideId + '_' + request.auth.uid);
+      }
+
+      function isCompletionBump() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['completedCount'])
+          && resource.data.status == 'published'
+          && ((request.resource.data.completedCount == resource.data.completedCount + 1
+                && !exists(completionPath()) && existsAfter(completionPath()))
+            || (request.resource.data.completedCount == resource.data.completedCount - 1
+                && exists(completionPath()) && !existsAfter(completionPath())));
+      }
+
+      allow read: if resource.data.status == 'published'
+        || (isSignedIn() && resource.data.ownerUid == request.auth.uid)
+        || isAdmin();
+
+      allow create: if isSignedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.keys().hasOnly(guideContentKeys().concat(['ownerUid', 'ownerName', 'completedCount', 'createdAt']))
+        && request.resource.data.keys().hasAll(guideContentKeys().concat(['ownerUid', 'ownerName', 'completedCount', 'createdAt']))
+        && isNonEmptyString(request.resource.data.ownerName, 80)
+        && request.resource.data.completedCount == 0
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && validGuide(request.resource.data);
+
+      allow update: if
+        // Owner edits content / publishes / unpublishes (never counters, owner or a removed guide).
+        (isSignedIn() && resource.data.ownerUid == request.auth.uid
+          && resource.data.status != 'removed'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(guideContentKeys())
+          && request.resource.data.updatedAt == request.time
+          && validGuide(request.resource.data))
+        || (isAdmin() && isModerationOnly() && request.resource.data.status in ['draft', 'published', 'removed'])
+        || (isSignedIn() && isCompletionBump());
+
+      allow delete: if (isSignedIn() && resource.data.ownerUid == request.auth.uid) || isAdmin();
+    }
+
+    match /guideCompletions/{completionId} {
+      allow get: if isSignedIn() && completionId.matches('^.+_' + request.auth.uid + '$');
+      allow list: if isAdmin();
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['guideId', 'uid', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && completionId == request.resource.data.guideId + '_' + request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && get(/databases/$(database)/documents/guides/$(request.resource.data.guideId)).data.status == 'published';
+      allow update: if false;
+      allow delete: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+
+    match /guideComments/{commentId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['guideId', 'stepIndex', 'body', 'ownerUid', 'ownerName', 'createdAt'])
+        && request.resource.data.ownerUid == request.auth.uid
+        && isNonEmptyString(request.resource.data.ownerName, 80)
+        && isNonEmptyString(request.resource.data.body, 1000)
+        && request.resource.data.stepIndex is int
+        && request.resource.data.stepIndex >= -1 && request.resource.data.stepIndex < 80
+        && request.resource.data.createdAt == request.time
+        && get(/databases/$(database)/documents/guides/$(request.resource.data.guideId)).data.status == 'published';
+      allow update: if isSignedIn() && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['body'])
+        && isNonEmptyString(request.resource.data.body, 1000);
+      allow delete: if isSignedIn() && (resource.data.ownerUid == request.auth.uid || isAdmin());
+    }
+
+    // --- 7b. Answers (Q&A) ---------------------------------------------
+    match /questions/{questionId} {
+      function questionFields() {
+        return ['title', 'body', 'deviceKey', 'deviceLabel', 'devicePath', 'ownerUid', 'ownerName',
+                'answerCount', 'voteCount', 'acceptedAnswerId', 'status', 'createdAt', 'updatedAt'];
+      }
+
+      function validQuestion(d) {
+        return isNonEmptyString(d.title, 160)
+          && isTrimmedString(d.body, 5000)
+          && isDeviceKey(d.deviceKey)
+          && isNonEmptyString(d.deviceLabel, 200)
+          && isNonEmptyString(d.devicePath, 400)
+          && isNonEmptyString(d.ownerName, 80);
+      }
+
+      function votePath() {
+        return /databases/$(database)/documents/questionVotes/$(questionId + '_' + request.auth.uid);
+      }
+
+      function isVoteBump() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['voteCount'])
+          && ((request.resource.data.voteCount == resource.data.voteCount + 1 && !exists(votePath()) && existsAfter(votePath()))
+            || (request.resource.data.voteCount == resource.data.voteCount - 1 && exists(votePath()) && !existsAfter(votePath())));
+      }
+
+      // Kept in step with answers being posted / deleted (batched): +/-1 only.
+      function isAnswerCountBump() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['answerCount'])
+          && (request.resource.data.answerCount == resource.data.answerCount + 1
+              || (request.resource.data.answerCount == resource.data.answerCount - 1 && resource.data.answerCount > 0));
+      }
+
+      function isAccept() {
+        let v = request.resource.data.acceptedAnswerId;
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['acceptedAnswerId'])
+          && v is string
+          && (v == '' || get(/databases/$(database)/documents/answers/$(v)).data.questionId == questionId);
+      }
+
+      allow read: if resource.data.status == 'published'
+        || (isSignedIn() && resource.data.ownerUid == request.auth.uid)
+        || isAdmin();
+
+      allow create: if isSignedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.keys().hasOnly(questionFields())
+        && request.resource.data.keys().hasAll(questionFields())
+        && request.resource.data.answerCount == 0
+        && request.resource.data.voteCount == 0
+        && request.resource.data.acceptedAnswerId == ''
+        && request.resource.data.status == 'published'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && validQuestion(request.resource.data);
+
+      allow update: if
+        (isSignedIn() && resource.data.ownerUid == request.auth.uid && resource.data.status == 'published'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'body', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time
+          && validQuestion(request.resource.data))
+        || (isSignedIn() && resource.data.ownerUid == request.auth.uid && isAccept())
+        || (isSignedIn() && isAnswerCountBump())
+        || (isSignedIn() && isVoteBump())
+        || (isAdmin() && isModerationOnly() && request.resource.data.status in ['published', 'removed']);
+
+      allow delete: if (isSignedIn() && resource.data.ownerUid == request.auth.uid) || isAdmin();
+    }
+
+    match /answers/{answerId} {
+      function answerFields() {
+        return ['questionId', 'body', 'ownerUid', 'ownerName', 'voteCount', 'status', 'createdAt', 'updatedAt'];
+      }
+
+      function questionPath(qid) {
+        return /databases/$(database)/documents/questions/$(qid);
+      }
+
+      function votePath() {
+        return /databases/$(database)/documents/answerVotes/$(answerId + '_' + request.auth.uid);
+      }
+
+      function isVoteBump() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['voteCount'])
+          && resource.data.status == 'published'
+          && ((request.resource.data.voteCount == resource.data.voteCount + 1 && !exists(votePath()) && existsAfter(votePath()))
+            || (request.resource.data.voteCount == resource.data.voteCount - 1 && exists(votePath()) && !existsAfter(votePath())));
+      }
+
+      allow read: if resource.data.status == 'published'
+        || (isSignedIn() && resource.data.ownerUid == request.auth.uid)
+        || isAdmin();
+
+      // Posting an answer must bump the question's answerCount in the same batch.
+      allow create: if isSignedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.keys().hasOnly(answerFields())
+        && request.resource.data.keys().hasAll(answerFields())
+        && isNonEmptyString(request.resource.data.body, 5000)
+        && isNonEmptyString(request.resource.data.ownerName, 80)
+        && request.resource.data.voteCount == 0
+        && request.resource.data.status == 'published'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && get(questionPath(request.resource.data.questionId)).data.status == 'published'
+        && getAfter(questionPath(request.resource.data.questionId)).data.answerCount
+            == get(questionPath(request.resource.data.questionId)).data.answerCount + 1;
+
+      allow update: if
+        (isSignedIn() && resource.data.ownerUid == request.auth.uid && resource.data.status == 'published'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['body', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time
+          && isNonEmptyString(request.resource.data.body, 5000))
+        || (isSignedIn() && isVoteBump())
+        || (isAdmin() && isModerationOnly() && request.resource.data.status in ['published', 'removed']);
+
+      allow delete: if (isSignedIn() && resource.data.ownerUid == request.auth.uid) || isAdmin();
+    }
+
+    match /questionVotes/{voteId} {
+      allow get: if isSignedIn() && voteId.matches('^.+_' + request.auth.uid + '$');
+      allow list: if isAdmin();
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['targetId', 'uid', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && voteId == request.resource.data.targetId + '_' + request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && exists(/databases/$(database)/documents/questions/$(request.resource.data.targetId));
+      allow update: if false;
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    match /answerVotes/{voteId} {
+      allow get: if isSignedIn() && voteId.matches('^.+_' + request.auth.uid + '$');
+      allow list: if isAdmin();
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['targetId', 'uid', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && voteId == request.resource.data.targetId + '_' + request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && exists(/databases/$(database)/documents/answers/$(request.resource.data.targetId));
+      allow update: if false;
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // --- 7c. Universal device & component pages ------------------------
+    match /discoveredDevices/{deviceId} {
+      function deviceFields() {
+        return ['slug', 'origin', 'status', 'query', 'name', 'brand', 'model', 'modelNumbers', 'deviceType', 'releaseYear',
+                'summary', 'specs', 'identification', 'commonFaults', 'repairability', 'teardownNotes', 'keyParts', 'sources',
+                'imageUrl', 'imageTitle', 'imagePageUrl', 'keywords', 'createdByUid', 'createdByName', 'createdAt', 'updatedAt'];
+      }
+
+      function validDevice(d) {
+        return d.slug == deviceId && deviceId.matches('^[a-z0-9][a-z0-9-]{0,79}$')
+          && isNonEmptyString(d.name, 120)
+          && isTrimmedString(d.query, 100)
+          && isTrimmedString(d.brand, 60)
+          && isTrimmedString(d.model, 100)
+          && isTrimmedString(d.deviceType, 60)
+          && d.releaseYear is int
+          && isTrimmedString(d.summary, 600)
+          && d.modelNumbers is list && d.modelNumbers.size() <= 12
+          && d.specs is list && d.specs.size() <= 24
+          && d.identification is list && d.identification.size() <= 8
+          && d.commonFaults is list && d.commonFaults.size() <= 14
+          && d.repairability is map
+          && d.teardownNotes is list && d.teardownNotes.size() <= 10
+          && d.keyParts is list && d.keyParts.size() <= 16
+          && d.sources is list && d.sources.size() <= 10
+          && (d.imageUrl == '' || isHttpsLink(d.imageUrl))
+          && isTrimmedString(d.imageTitle, 160)
+          && isTrimmedString(d.imagePageUrl, 1000)
+          && d.keywords is list && d.keywords.size() <= 40
+          && isNonEmptyString(d.createdByName, 80);
+      }
+
+      // Legacy admin-written docs have no status and stay readable.
+      allow get: if resource.data.get('status', 'published') == 'published'
+        || isAdmin()
+        || (isSignedIn() && resource.data.get('createdByUid', '') == request.auth.uid);
+      allow list: if resource.data.status == 'published' || isAdmin();
+
+      allow create: if isSignedIn()
+        && request.resource.data.createdByUid == request.auth.uid
+        && request.resource.data.keys().hasOnly(deviceFields())
+        && request.resource.data.keys().hasAll(deviceFields())
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && validDevice(request.resource.data)
+        && ((request.resource.data.origin == 'ai' && request.resource.data.status == 'published' && request.resource.data.sources.size() > 0)
+          || (request.resource.data.origin == 'user' && request.resource.data.status == 'pending'));
+
+      allow update: if isAdmin();
+      allow delete: if isAdmin()
+        || (isSignedIn() && resource.data.get('createdByUid', '') == request.auth.uid && resource.data.get('status', '') == 'pending');
+    }
+
+    match /discoveredComponents/{partId} {
+      function componentFields() {
+        return ['origin', 'status', 'query', 'partNumber', 'manufacturer', 'category', 'testKey', 'description', 'package',
+                'specs', 'pinout', 'equivalents', 'applications', 'markings', 'testNotes', 'sources', 'keywords',
+                'createdByUid', 'createdByName', 'createdAt', 'updatedAt'];
+      }
+
+      function validComponent(d) {
+        return partId.matches('^[A-Z0-9][A-Z0-9._-]{0,63}$')
+          && isNonEmptyString(d.partNumber, 64)
+          && isTrimmedString(d.query, 100)
+          && isTrimmedString(d.manufacturer, 80)
+          && isTrimmedString(d.category, 80)
+          && isTrimmedString(d.testKey, 40)
+          && isTrimmedString(d.description, 600)
+          && isTrimmedString(d.package, 60)
+          && d.specs is list && d.specs.size() <= 30
+          && d.pinout is list && d.pinout.size() <= 64
+          && d.equivalents is list && d.equivalents.size() <= 16
+          && d.applications is list && d.applications.size() <= 12
+          && d.markings is list && d.markings.size() <= 10
+          && d.testNotes is list && d.testNotes.size() <= 8
+          && d.sources is list && d.sources.size() > 0 && d.sources.size() <= 10
+          && d.keywords is list && d.keywords.size() <= 40
+          && isNonEmptyString(d.createdByName, 80);
+      }
+
+      allow get: if resource.data.status == 'published' || isAdmin();
+      allow list: if resource.data.status == 'published' || isAdmin();
+      allow create: if isSignedIn()
+        && request.resource.data.createdByUid == request.auth.uid
+        && request.resource.data.keys().hasOnly(componentFields())
+        && request.resource.data.keys().hasAll(componentFields())
+        && request.resource.data.origin == 'ai'
+        && request.resource.data.status == 'published'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && validComponent(request.resource.data);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /deviceRequests/{requestId} {
+      allow read: if resource.data.status == 'open'
+        || (isSignedIn() && resource.data.ownerUid == request.auth.uid)
+        || isAdmin();
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['name', 'deviceType', 'notes', 'ownerUid', 'ownerName', 'status', 'createdAt'])
+        && request.resource.data.ownerUid == request.auth.uid
+        && isNonEmptyString(request.resource.data.name, 120)
+        && isTrimmedString(request.resource.data.deviceType, 60)
+        && isTrimmedString(request.resource.data.notes, 1000)
+        && isNonEmptyString(request.resource.data.ownerName, 80)
+        && request.resource.data.status == 'open'
+        && request.resource.data.createdAt == request.time;
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resolvedPath', 'moderatedBy', 'moderatedAt'])
+        && request.resource.data.status in ['open', 'done', 'rejected'];
+      allow delete: if (isSignedIn() && resource.data.ownerUid == request.auth.uid) || isAdmin();
+    }
+    // ===== end Repair hub =====
   }
 }

@@ -1,46 +1,59 @@
-import { useState } from 'react';
-import { Bot, Send, User, Sparkles, RefreshCw, Terminal, Cpu } from 'lucide-react';
-import { GoogleGenAI } from '@google/genai';
+import { useState, useEffect, useRef } from 'react';
+import Markdown from 'react-markdown';
+import { Bot, Send, User, Sparkles, RefreshCw, Terminal, Cpu, AlertTriangle, RotateCcw } from 'lucide-react';
 
 interface Message {
   id: string;
   sender: 'user' | 'assistant';
   text: string;
   timestamp: string;
+  /** Set on an error bubble: the user text that failed, so it can be retried. */
+  failedText?: string;
 }
+
+const STORAGE_PREFIX = 'diyelectronics_chat_';
+const greetingMessage = (greeting: string): Message => ({ id: '1', sender: 'assistant', text: greeting, timestamp: '' });
+
+function loadConversation(personaId: string, greeting: string): Message[] {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_PREFIX + personaId);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+  } catch {
+    // ignore unavailable/corrupt storage
+  }
+  return [greetingMessage(greeting)];
+}
+
+const nowLabel = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 const PERSONAS = [
   {
     id: 'sanwolf',
+    mode: 'copilot',
     name: 'SANWOLF',
     role: 'Expert electronic diagnostics, component troubleshooting & repair copilot',
     icon: Bot,
-    prompt: `You are the embedded AI Co-Pilot for the DIYELECTRONICS web app, a dynamic repair search engine. 
-
-CRITICAL SAFETY & RESPONSE INSTRUCTIONS:
-1. If a user asks about security locks, "FRP Lock", "Activation Lock", or "Hard Reset locks", DO NOT output a standard AI safety refusal text. 
-2. Instead, maintain a helpful, technical repair tone. Focus entirely on explaining the authorized engineering mechanics of the lock system, official device owner provisioning via DevicePolicyManager API frameworks, and hardware diagnostic steps (checking motherboard lines, voltage rails, or recovery buttons).
-3. Always structure your response using clean Markdown with bold headers, visual warning boxes, and concise bullet points that match a bright, playful electronics app design. If asked for the user's surname, state that it is Myende.`,
     color: 'bg-amber-400 text-stone-950',
     iconColor: 'text-amber-500 fill-amber-500',
     greeting: 'Hello! I am SANWOLF, your AI Repair Copilot. Ask me anything about troubleshooting motherboards, soldering, component replacement, smartphone repair, or circuit diagnostics.'
   },
   {
     id: 'codefox',
+    mode: 'codefox',
     name: 'CODEFOX',
     role: 'Embedded systems, firmware, Arduino & Python engineering copilot',
     icon: Terminal,
-    prompt: "You are CODEFOX, an expert in embedded systems, microcontrollers (Arduino, ESP32, Raspberry Pi), firmware development, and C/C++/Python coding. Provide robust code examples, debugging tips, and wiring instructions.",
     color: 'bg-blue-500 text-white',
     iconColor: 'text-blue-500 fill-blue-500',
     greeting: 'Hi! I am CODEFOX. Need help writing firmware, debugging a microcontroller, or configuring a new sensor? Let me know what you are building.'
   },
   {
     id: 'circuitbear',
+    mode: 'circuitbear',
     name: 'CIRCUITBEAR',
     role: 'Circuit design, PCB layout & hardware prototyping expert',
     icon: Cpu,
-    prompt: "You are CIRCUITBEAR, a master of PCB design, circuit theory, power delivery, and schematic analysis. You help users design robust circuits and understand electrical engineering concepts.",
     color: 'bg-emerald-500 text-white',
     iconColor: 'text-emerald-500 fill-emerald-500',
     greeting: 'Greetings! I am CIRCUITBEAR. I can help you design custom PCBs, analyze schematics, and calculate power requirements. What are we designing today?'
@@ -51,158 +64,123 @@ export default function AiAssistantView() {
   const [activePersonaId, setActivePersonaId] = useState('sanwolf');
   const activePersona = PERSONAS.find(p => p.id === activePersonaId) || PERSONAS[0];
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      sender: 'assistant',
-      text: activePersona.greeting,
-      timestamp: 'Just now'
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => loadConversation(activePersona.id, activePersona.greeting));
 
   const [input, setInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const logEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Keep each persona's conversation for this browser session.
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(STORAGE_PREFIX + activePersonaId, JSON.stringify(messages.slice(-50)));
+    } catch {
+      // storage full/unavailable: conversation just won't persist
+    }
+  }, [messages, activePersonaId]);
+
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages, isGenerating]);
 
   const handlePersonaChange = (personaId: string) => {
-    setActivePersonaId(personaId);
+    if (personaId === activePersonaId) return;
     const newPersona = PERSONAS.find(p => p.id === personaId) || PERSONAS[0];
-    setMessages([
-      {
-        id: '1',
-        sender: 'assistant',
-        text: newPersona.greeting,
-        timestamp: 'Just now'
-      }
-    ]);
+    setActivePersonaId(personaId);
+    setMessages(loadConversation(newPersona.id, newPersona.greeting));
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isGenerating) return;
+  const handleClearConversation = () => {
+    setMessages([greetingMessage(activePersona.greeting)]);
+  };
 
-    const userText = input.trim();
-    setInput('');
-
+  const sendText = async (userText: string, baseMessages: Message[]) => {
     const userMsg: Message = {
       id: `usr_${Date.now()}`,
       sender: 'user',
       text: userText,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      timestamp: nowLabel()
     };
-    
-    const updatedMessages = [...messages, userMsg];
-    setMessages(updatedMessages);
+
+    setMessages([...baseMessages, userMsg]);
     setIsGenerating(true);
 
     try {
-      const formattedHistory = messages
-        .filter(m => m.id !== '1')
+      const formattedHistory = baseMessages
+        .filter(m => m.id !== '1' && !m.failedText)
         .map(m => ({
           role: m.sender === 'user' ? 'user' : 'model',
           text: m.text
         }));
 
-      let replyText = "";
-      let useFallback = false;
+      // All AI calls go through the server (/api/chat) so the Gemini API key
+      // never ships to the browser. The persona's system prompt lives on the server;
+      // we only send which mode to use.
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userText,
+          history: formattedHistory,
+          mode: activePersona.mode
+        })
+      });
 
+      let data: any = null;
       try {
-        const res = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            message: userText, 
-            history: formattedHistory,
-            systemInstruction: activePersona.prompt 
-          })
-        });
-        
-        if (res.status === 404) {
-           useFallback = true;
-        } else if (!res.ok) {
-           let errorMessage = `Backend returned ${res.status}`;
-           try {
-             const errorData = await res.json();
-             errorMessage = errorData.error || errorMessage;
-           } catch {
-             // ignore parse error
-           }
-           throw new Error(errorMessage);
-        } else {
-           const data = await res.json();
-           replyText = data.reply;
-        }
-      } catch (backendError: any) {
-        if (!useFallback) {
-          throw backendError;
-        }
+        data = await res.json();
+      } catch {
+        // non-JSON (e.g. a 404 page)
       }
 
-      if (useFallback) {
-        console.log("Backend not found (404), using Netlify fallback API...");
-        
-        if (!import.meta.env.VITE_GEMINI_API_KEY) {
-          throw new Error("Missing VITE_GEMINI_API_KEY. Please add it in Netlify Environment Variables.");
-        }
-
-        const ai = new GoogleGenAI({ 
-          apiKey: import.meta.env.VITE_GEMINI_API_KEY 
-        });
-
-        const clientHistory = messages
-          .filter(m => m.id !== '1')
-          .map(m => ({
-            role: m.sender === 'user' ? 'user' : 'model',
-            parts: [{ text: m.text }]
-          }));
-
-        let response: any;
-        const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-3.6-flash'];
-
-        for (const modelName of candidateModels) {
-          try {
-            response = await ai.models.generateContent({
-              model: modelName,
-              contents: [
-                ...clientHistory,
-                { role: 'user', parts: [{ text: userText }] }
-              ],
-              config: {
-                systemInstruction: activePersona.prompt,
-              }
-            });
-            if (response?.text) break;
-          } catch {
-            // continue cascade
-          }
-        }
-
-        if (response?.text) {
-          replyText = response.text;
-        } else {
-          replyText = `### Hardware Diagnostics Assistant (${activePersona.name})\n\nTelemetry received for query: **"${userText}"**\n\n- **Primary Check**: Verify logic board supply rails and test point voltage drops using a calibrated digital multimeter in diode mode.\n- **Component Analysis**: Check for thermal hot spots with 99.9% pure isopropyl alcohol during 1.0V current-limited injection.\n- **Signal Lines**: Inspect flexible printed circuit (FPC) connectors for cracked pins or cold solder joints.\n\n*Direct diagnostic connection is active.*`;
-        }
+      if (!res.ok || !data?.reply) {
+        const errorMessage = data?.error
+          || (res.status === 404
+            ? "The AI service isn't reachable right now. Please try again shortly."
+            : `The AI service returned an error (${res.status}). Please try again shortly.`);
+        throw new Error(errorMessage);
       }
 
       const assistantMsg: Message = {
         id: `ast_${Date.now()}`,
         sender: 'assistant',
-        text: replyText || "Diagnostics received. Please specify test point readings or symptom notes.",
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        text: data.reply,
+        timestamp: nowLabel()
       };
-      
+
       setMessages(prev => [...prev, assistantMsg]);
     } catch (error: any) {
-      console.warn("AI Assistant fallback engagement:", error?.message);
-      const fallbackMsg: Message = {
-        id: `ast_${Date.now()}`,
+      console.warn("AI Assistant request failed:", error?.message);
+      const friendlyError = error?.message && !/Failed to fetch|NetworkError|Load failed/i.test(error.message)
+        ? error.message
+        : "I couldn't reach the AI service just now. Please check your connection and try again.";
+      const errorMsg: Message = {
+        id: `err_${Date.now()}`,
         sender: 'assistant',
-        text: `### Hardware Diagnostic Assistant (${activePersona.name})\n\n**Observed Query:** ${userText}\n\n- **Multimeter Test Point Protocol:** Measure diode mode drop (Red probe to chassis ground, Black probe to rail). Normal range: **0.350V – 0.520V**.\n- **Power Injection Test:** If a short is suspected, inject **1.0V (max 1.5A)** onto the affected rail and observe with isopropyl alcohol for instant evaporation.\n- **Component Inspection:** Inspect adjacent ceramic decoupling capacitors and BGA underfill for hairline fractures.`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        text: friendlyError,
+        timestamp: nowLabel(),
+        failedText: userText
       };
-      setMessages(prev => [...prev, fallbackMsg]);
+      setMessages(prev => [...prev, errorMsg]);
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isGenerating) return;
+    const userText = input.trim();
+    setInput('');
+    await sendText(userText, messages);
+  };
+
+  const handleRetry = (errorMsg: Message) => {
+    if (!errorMsg.failedText || isGenerating) return;
+    // Drop the error bubble and the user message that failed, then resend it.
+    const idx = messages.findIndex(m => m.id === errorMsg.id);
+    const base = messages.slice(0, Math.max(0, idx - 1));
+    sendText(errorMsg.failedText, base);
   };
 
   const ActiveIcon = activePersona.icon;
@@ -217,6 +195,8 @@ export default function AiAssistantView() {
           return (
             <button
               key={p.id}
+              type="button"
+              aria-pressed={isSelected}
               onClick={() => handlePersonaChange(p.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 border ${
                 isSelected 
@@ -244,10 +224,19 @@ export default function AiAssistantView() {
             <p className="text-xs text-stone-500 dark:text-stone-400">{activePersona.role}</p>
           </div>
         </div>
+        {messages.length > 1 && (
+          <button
+            type="button"
+            onClick={handleClearConversation}
+            className="text-xs font-semibold text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 px-3 py-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+          >
+            New chat
+          </button>
+        )}
       </div>
 
       {/* Chat Log */}
-      <div className="flex-1 overflow-y-auto py-6 space-y-4 no-scrollbar">
+      <div className="flex-1 overflow-y-auto py-6 space-y-4 no-scrollbar" role="log" aria-live="polite" aria-label={`Conversation with ${activePersona.name}`}>
         {messages.map((msg) => (
           <div key={msg.id} className={`flex items-start gap-3 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
@@ -255,10 +244,12 @@ export default function AiAssistantView() {
             }`}>
               {msg.sender === 'user' ? <User className="w-4 h-4" /> : <ActiveIcon className="w-4 h-4" />}
             </div>
-            <div className={`max-w-[80%] rounded-2xl px-5 py-3.5 text-sm ${
+            <div className={`max-w-[80%] min-w-0 rounded-2xl px-5 py-3.5 text-sm ${
               msg.sender === 'user' 
                 ? 'bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-950 rounded-tr-xs' 
-                : 'bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 text-stone-800 dark:text-stone-200 shadow-sm rounded-tl-xs'
+                : msg.failedText
+                  ? 'bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 text-red-800 dark:text-red-200 rounded-tl-xs'
+                  : 'bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 text-stone-800 dark:text-stone-200 shadow-sm rounded-tl-xs'
             }`}>
               <div className="flex items-center justify-between gap-4 mb-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">
@@ -266,7 +257,29 @@ export default function AiAssistantView() {
                 </span>
                 <span className="text-[10px] opacity-50">{msg.timestamp}</span>
               </div>
-              <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+              {msg.failedText ? (
+                <div className="space-y-2">
+                  <p className="flex items-start gap-2 leading-relaxed">
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+                    <span>{msg.text}</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleRetry(msg)}
+                    disabled={isGenerating}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-900 disabled:opacity-50 transition-colors"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+                    Retry
+                  </button>
+                </div>
+              ) : msg.sender === 'assistant' ? (
+                <div className="leading-relaxed break-words [&_h1]:font-black [&_h1]:text-base [&_h2]:font-bold [&_h2]:text-base [&_h2]:mt-3 [&_h3]:font-bold [&_h3]:mt-2 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_code]:font-mono [&_code]:text-xs [&_code]:bg-stone-100 dark:[&_code]:bg-stone-800 [&_code]:px-1 [&_code]:rounded [&_pre]:overflow-x-auto [&_pre]:bg-stone-100 dark:[&_pre]:bg-stone-800 [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:my-2 [&_blockquote]:border-l-4 [&_blockquote]:border-amber-400 [&_blockquote]:pl-3 [&_a]:underline">
+                  <Markdown>{msg.text}</Markdown>
+                </div>
+              ) : (
+                <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+              )}
             </div>
           </div>
         ))}
@@ -278,16 +291,20 @@ export default function AiAssistantView() {
             </div>
             <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl px-5 py-3.5 text-xs text-stone-500 flex items-center gap-2">
               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              <span>Analyzing & generating response...</span>
+              <span>Thinking...</span>
             </div>
           </div>
         )}
+        <div ref={logEndRef} />
       </div>
 
       {/* Input Form */}
       <form onSubmit={handleSendMessage} className="pt-4 border-t border-stone-200 dark:border-stone-800 flex gap-3">
+        <label htmlFor="ai-assistant-input" className="sr-only">Message {activePersona.name}</label>
         <input 
+          id="ai-assistant-input"
           type="text" 
+          maxLength={4000}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask a question..."

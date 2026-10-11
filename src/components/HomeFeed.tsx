@@ -1,318 +1,374 @@
-import { useState } from 'react';
-import { ThumbsUp, MessageCircle, Share2, Image, Send, CheckCircle2, HelpCircle, Sparkles } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { Image as ImageIcon, HelpCircle, Sparkles, X, Tag, Loader2, Cloud, HardDrive, LogIn } from 'lucide-react';
 import type { ForumPost, UserProfile } from '../types';
 import type { ThemeConfig } from '../lib/theme';
-import { initialParts } from '../data';
+import { useCommunity, compressImage, type CommunityPost } from '../lib/community';
+import { useMarketplaceListings, requestListingFocus, type ListingItem } from '../lib/marketplaceListings';
+import MarketplaceStories from './home/MarketplaceStories';
+import CommunityPostCard from './home/CommunityPostCard';
+
+const CATEGORIES = ['Smartphones', 'Laptops & PCs', 'Gaming Consoles', 'TVs & Monitors', 'Audio & Headphones', 'Tablets', 'Home Appliances', 'Other'];
+const BRANDS = ['Apple', 'Samsung', 'Xiaomi', 'Huawei', 'Google', 'Sony', 'Nintendo', 'Microsoft', 'LG', 'Dell', 'HP', 'Lenovo', 'Asus', 'Acer', 'JBL', 'Bose', 'Hisense', 'Defy'];
+
+type FeedFilter = 'all' | 'open' | 'solved' | 'mine';
 
 export default function HomeFeed({
   posts,
   currentUser,
-  onAddPost,
-  onAddReply,
-  onToggleLike,
-  themeConfig
+  themeConfig,
+  onOpenAuth,
+  onSelectMarketplace
 }: {
+  /** Seeded/starter posts (shown below community posts). */
   posts: ForumPost[];
   currentUser: UserProfile;
-  onAddPost: (post: ForumPost) => void;
-  onAddReply: (postId: string, content: string) => void;
-  onToggleLike: (postId: string) => void;
+  /** Legacy props kept for API compatibility; the Home feed now manages its own persistence. */
+  onAddPost?: (post: ForumPost) => void;
+  onAddReply?: (postId: string, content: string) => void;
+  onToggleLike?: (postId: string) => void;
   themeConfig?: ThemeConfig;
+  /** Opens the existing AuthModal. */
+  onOpenAuth?: () => void;
+  /** Switches to the Marketplace view with a search query (App's handleSelectMarketplace). */
+  onSelectMarketplace?: (query: string) => void;
 }) {
-  const [newPostText, setNewPostText] = useState('');
-  const [newTitle, setNewTitle] = useState('');
-  const [newCategory, setNewCategory] = useState('Smartphones');
-  const [newModel, setNewModel] = useState('');
-  const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
-  const [replyInput, setReplyInput] = useState('');
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const api = useCommunity(posts, currentUser);
+  const listings = useMarketplaceListings();
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [filter, setFilter] = useState<FeedFilter>('all');
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<number | null>(null);
 
-  const handlePostSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTitle && !newPostText) return;
-
-    const post: ForumPost = {
-      id: `fb_post_${Date.now()}`,
-      title: newTitle || newPostText.slice(0, 60) + '...',
-      content: newPostText || newTitle,
-      author: {
-        name: currentUser.name,
-        avatar: currentUser.avatar,
-        role: currentUser.role,
-        isVerifiedCompany: currentUser.isVerifiedCompany
-      },
-      deviceCategory: newCategory,
-      deviceModel: newModel || 'Universal',
-      issueType: 'General Diagnostic',
-      tags: [newCategory, newModel].filter(Boolean),
-      upvotes: 1,
-      repliesCount: 0,
-      isSolved: false,
-      createdAt: 'Just now',
-      replies: []
-    };
-
-    onAddPost(post);
-    setNewPostText('');
-    setNewTitle('');
-    setNewModel('');
-    setIsCreateModalOpen(false);
+  const showToast = (msg: string) => {
+    setToast(msg);
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(null), 2800);
   };
 
-  const handleReplySubmit = (postId: string, e: React.FormEvent) => {
-    e.preventDefault();
-    if (!replyInput.trim()) return;
-    onAddReply(postId, replyInput);
-    setReplyInput('');
+  useEffect(() => () => {
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+  }, []);
+
+  const promptSignIn = (msg = 'Sign in to post, like and comment') => {
+    showToast(msg);
+    onOpenAuth?.();
   };
+
+  /** Gate for any write action. */
+  const requireAuth = (post?: CommunityPost) => {
+    if (!api.signedIn) {
+      promptSignIn();
+      return false;
+    }
+    if (post?.source === 'firestore' && !api.canWriteRemote) {
+      showToast('Sign in with your DIY Electronics account to join cloud threads');
+      onOpenAuth?.();
+      return false;
+    }
+    return true;
+  };
+
+  const openCreate = () => {
+    if (!requireAuth()) return;
+    setIsCreateOpen(true);
+  };
+
+  const handleViewItem = (item: ListingItem) => {
+    requestListingFocus(item.id);
+    onSelectMarketplace?.(item.title);
+  };
+
+  const visible = api.posts.filter(p => {
+    if (filter === 'open') return !p.isSolved;
+    if (filter === 'solved') return p.isSolved;
+    if (filter === 'mine') return api.isMine(p.authorUid);
+    return true;
+  });
+
+  const firstName = currentUser.name?.split(' ')[0] || 'there';
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-      {/* Facebook Style Stories / Shortcuts Bar */}
-      <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
-        {initialParts.slice(0, 5).map((part, i) => (
-          <div key={part.id} className="w-28 h-44 rounded-2xl relative overflow-hidden shadow-sm shrink-0 cursor-pointer group">
-            <img src={`https://source.unsplash.com/random/300x400?electronics&sig=${i}`} alt={part.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-between p-3">
-              <div className="w-7 h-7 rounded-full border-2 border-blue-500 overflow-hidden bg-white">
-                <img src={currentUser.avatar} alt="User" className="w-full h-full object-cover" />
-              </div>
-              <div>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-600 text-white inline-block mb-1">{part.category}</span>
-                <p className="text-white text-xs font-bold leading-tight truncate">{part.name}</p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+    <div className="max-w-2xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-5">
+      {/* Marketplace Stories */}
+      <MarketplaceStories listings={listings} onViewItem={handleViewItem} onOpenMarketplace={onSelectMarketplace ? () => onSelectMarketplace('') : undefined} />
 
-      {/* Facebook Style "What's on your mind?" Create Post Card */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-xs space-y-3">
+      {/* Composer */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-sm shadow-slate-200/50 dark:shadow-none space-y-3">
         <div className="flex items-center gap-3">
-          <img src={currentUser.avatar} alt={currentUser.name} className="w-10 h-10 rounded-full object-cover border" referrerPolicy="no-referrer" />
-          <button 
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex-1 text-left px-4 py-2.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-750 transition-colors text-xs font-medium"
+          <img src={currentUser.avatar} alt={currentUser.name} className="w-10 h-10 rounded-full object-cover ring-2 ring-indigo-100 dark:ring-indigo-900/50" referrerPolicy="no-referrer" />
+          <button
+            onClick={openCreate}
+            className="flex-1 text-left px-4 py-2.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200/80 dark:hover:bg-slate-700/70 transition-colors text-sm"
           >
-            What's on your mind or repair bench today, {currentUser.name.split(' ')[0]}?
+            {api.signedIn ? `Stuck on a repair, ${firstName}? Ask the community…` : 'Sign in to ask the community for help…'}
           </button>
         </div>
-
         <div className="pt-2 border-t border-slate-100 dark:border-slate-800 grid grid-cols-3 gap-1 text-center">
-          <button 
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300 transition-colors"
-          >
-            <Image className="w-4 h-4 text-emerald-500" />
-            <span>Photo/Video</span>
+          <button onClick={openCreate} className="flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300 transition-colors">
+            <ImageIcon className="w-4 h-4 text-emerald-500" />
+            Photo
           </button>
-          <button 
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300 transition-colors"
-          >
-            <Sparkles className="w-4 h-4 text-amber-500" />
-            <span>Tag IC / Model</span>
+          <button onClick={openCreate} className="flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300 transition-colors">
+            <Tag className="w-4 h-4 text-violet-500" />
+            Tag device
           </button>
-          <button 
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300 transition-colors"
-          >
-            <HelpCircle className="w-4 h-4 text-blue-500" />
-            <span>Ask Help</span>
+          <button onClick={openCreate} className="flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300 transition-colors">
+            <HelpCircle className="w-4 h-4 text-indigo-500" />
+            Ask help
           </button>
         </div>
       </div>
 
-      {/* Posts Feed */}
+      {/* Filter chips */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {(
+            [
+              ['all', 'All'],
+              ['open', 'Needs help'],
+              ['solved', 'Solved'],
+              ['mine', 'My posts']
+            ] as [FeedFilter, string][]
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setFilter(id)}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
+                filter === id
+                  ? 'bg-gradient-to-r from-indigo-600 to-violet-500 text-white shadow-sm shadow-indigo-500/25'
+                  : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-300'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <span
+          title={api.backend === 'firestore' ? 'Synced live with the cloud' : 'Saved on this device'}
+          className="hidden sm:flex items-center gap-1 text-[10px] font-bold text-slate-400 shrink-0"
+        >
+          {api.backend === 'firestore' ? <Cloud className="w-3.5 h-3.5 text-emerald-500" /> : <HardDrive className="w-3.5 h-3.5" />}
+          {api.backend === 'firestore' ? 'Live' : 'On this device'}
+        </span>
+      </div>
+
+      {/* Feed */}
       <div className="space-y-4">
-        {posts.map((post) => {
-          const isCommenting = activeCommentPostId === post.id;
-          return (
-            <div key={post.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
-              {/* Post Author Header */}
-              <div className="p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <img src={post.author.avatar} alt={post.author.name} className="w-10 h-10 rounded-full object-cover border" referrerPolicy="no-referrer" />
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">{post.author.name}</span>
-                      {post.author.isVerifiedCompany && (
-                        <span className="w-3.5 h-3.5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[9px] font-bold">✓</span>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                      <span>{post.createdAt}</span> • <span>{post.deviceCategory}</span> ({post.deviceModel})
-                    </p>
-                  </div>
-                </div>
-
-                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 ${post.isSolved ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'}`}>
-                  {post.isSolved ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : <HelpCircle className="w-3 h-3 text-amber-500" />}
-                  <span>{post.isSolved ? 'SOLVED' : 'ACTIVE'}</span>
-                </span>
-              </div>
-
-              {/* Post Content */}
-              <div className="px-4 pb-3 space-y-2">
-                <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100">{post.title}</h2>
-                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{post.content}</p>
-                {post.tags && post.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    {post.tags.map((t, idx) => (
-                      <span key={idx} className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">#{t}</span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Likes & Comments Count Bar */}
-              <div className="px-4 py-2 border-t border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center">
-                    <ThumbsUp className="w-3 h-3" />
-                  </div>
-                  <span>{post.upvotes} technician likes</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span>{post.repliesCount || post.replies.length} comments</span>
-                </div>
-              </div>
-
-              {/* Action Buttons (Like, Comment, Share) */}
-              <div className="px-2 py-1 grid grid-cols-3 gap-1">
-                <button 
-                  onClick={() => onToggleLike(post.id)}
-                  className="flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300 transition-colors"
-                >
-                  <ThumbsUp className="w-4 h-4 text-blue-600" />
-                  <span>Like</span>
-                </button>
-                <button 
-                  onClick={() => setActiveCommentPostId(isCommenting ? null : post.id)}
-                  className="flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300 transition-colors"
-                >
-                  <MessageCircle className="w-4 h-4 text-emerald-500" />
-                  <span>Comment</span>
-                </button>
-                <button 
-                  onClick={() => navigator.clipboard.writeText(window.location.href)}
-                  className="flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300 transition-colors"
-                >
-                  <Share2 className="w-4 h-4 text-indigo-500" />
-                  <span>Share</span>
-                </button>
-              </div>
-
-              {/* Comments Section */}
-              {isCommenting && (
-                <div className="p-4 bg-slate-50 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800 space-y-3">
-                  <div className="space-y-2.5">
-                    {post.replies.map((reply) => (
-                      <div key={reply.id} className="flex items-start gap-2.5 text-xs">
-                        <img src={reply.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"} alt={reply.author} className="w-7 h-7 rounded-full object-cover border mt-0.5" referrerPolicy="no-referrer" />
-                        <div className="flex-1 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-slate-900 dark:text-white">{reply.author}</span>
-                            <span className="text-[10px] text-slate-400">{reply.createdAt}</span>
-                          </div>
-                          <p className="text-slate-700 dark:text-slate-300">{reply.content}</p>
-                        </div>
-                      </div>
-                    ))}
-                    {post.replies.length === 0 && (
-                      <p className="text-xs text-slate-400 text-center py-2">No technical comments yet. Be the first to advise!</p>
-                    )}
-                  </div>
-
-                  <form onSubmit={(e) => handleReplySubmit(post.id, e)} className="flex items-center gap-2 pt-2">
-                    <img src={currentUser.avatar} alt={currentUser.name} className="w-8 h-8 rounded-full object-cover border" referrerPolicy="no-referrer" />
-                    <input 
-                      type="text" 
-                      value={replyInput}
-                      onChange={(e) => setReplyInput(e.target.value)}
-                      placeholder="Write a technical reply or diagnostic tip..."
-                      className="flex-1 px-4 py-2 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <button type="submit" className="p-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors">
-                      <Send className="w-4 h-4" />
-                    </button>
-                  </form>
-                </div>
-              )}
-            </div>
-          );
-        })}
+        <AnimatePresence initial={false}>
+          {visible.map(post => (
+            <CommunityPostCard key={post.id} post={post} api={api} currentUser={currentUser} requireAuth={requireAuth} onToast={showToast} />
+          ))}
+        </AnimatePresence>
+        {visible.length === 0 && (
+          <div className="text-center py-10 px-6 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-sm text-slate-500">
+            {filter === 'mine' ? "You haven't posted yet." : 'Nothing here yet.'}{' '}
+            <button onClick={openCreate} className="text-indigo-600 dark:text-indigo-400 font-bold">Start a thread</button>
+          </div>
+        )}
       </div>
 
-      {/* Create Post Modal */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4">
-          <form onSubmit={handlePostSubmit} className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-base font-black text-slate-900 dark:text-white">Create Repair & Forum Post</h3>
-              <button type="button" onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-slate-700 font-bold text-sm">✕</button>
-            </div>
+      <AnimatePresence>
+        {isCreateOpen && (
+          <CreatePostModal
+            currentUser={currentUser}
+            themeConfig={themeConfig}
+            onClose={() => setIsCreateOpen(false)}
+            onSubmit={async input => {
+              await api.createPost(input);
+              setIsCreateOpen(false);
+              setFilter('all');
+              showToast('Posted — the community will chime in soon');
+            }}
+          />
+        )}
+      </AnimatePresence>
 
-            <div className="space-y-3">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Post Title / Issue Summary</label>
-                <input 
-                  type="text" 
-                  required
-                  value={newTitle} 
-                  onChange={e => setNewTitle(e.target.value)} 
-                  placeholder="e.g., iPhone 15 Pro Max short on PP_VDD_MAIN" 
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100" 
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Device Category</label>
-                  <select 
-                    value={newCategory} 
-                    onChange={e => setNewCategory(e.target.value)} 
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100"
-                  >
-                    <option>Smartphones</option>
-                    <option>Gaming Consoles</option>
-                    <option>Laptops & PCs</option>
-                    <option>TVs & Monitors</option>
-                    <option>Audio & Headphones</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Specific Model / IC</label>
-                  <input 
-                    type="text" 
-                    value={newModel} 
-                    onChange={e => setNewModel(e.target.value)} 
-                    placeholder="e.g. A2849 / PMIC" 
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100" 
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">What's on your mind / Diagnostic details</label>
-                <textarea 
-                  rows={4}
-                  required
-                  value={newPostText}
-                  onChange={e => setNewPostText(e.target.value)}
-                  placeholder="Describe your boardview readings, thermal camera results, or ask colleagues for advice..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
-              <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold">Cancel</button>
-              <button type="submit" className={`px-5 py-2 rounded-xl ${themeConfig?.primaryBg || 'bg-blue-600'} text-white text-xs font-black hover:opacity-90`}>Post to Feed</button>
-            </div>
-          </form>
-        </div>
-      )}
+      {/* Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[80] w-max max-w-[90vw] px-4 py-2.5 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold shadow-xl flex items-center gap-2"
+            role="status"
+          >
+            {!api.signedIn && <LogIn className="w-3.5 h-3.5" />}
+            {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+function CreatePostModal({
+  currentUser,
+  themeConfig,
+  onClose,
+  onSubmit
+}: {
+  currentUser: UserProfile;
+  themeConfig?: ThemeConfig;
+  onClose: () => void;
+  onSubmit: (input: { title: string; content: string; imageUrl: string | null; deviceCategory: string; brand: string; deviceModel: string }) => Promise<void>;
+}) {
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [category, setCategory] = useState('Smartphones');
+  const [brand, setBrand] = useState('');
+  const [model, setModel] = useState('');
+  const [image, setImage] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const onFile = async (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file.');
+      return;
+    }
+    setError(null);
+    setProcessing(true);
+    try {
+      setImage(await compressImage(file));
+    } catch {
+      setError('Could not read that image.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !content.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      await onSubmit({ title: title.trim(), content: content.trim(), imageUrl: image, deviceCategory: category, brand: brand.trim(), deviceModel: model.trim() });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const field =
+    'w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500';
+  const label = 'block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1';
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/60 backdrop-blur-sm sm:p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.form
+        onSubmit={submit}
+        onClick={e => e.stopPropagation()}
+        initial={{ y: 40, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 40, opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 360, damping: 32 }}
+        className="w-full sm:max-w-lg max-h-[92vh] overflow-y-auto bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 space-y-4 shadow-2xl"
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-emerald-500" /> Ask the community
+          </h3>
+          <button type="button" onClick={onClose} aria-label="Close" className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <img src={currentUser.avatar} alt="" className="w-9 h-9 rounded-full object-cover" referrerPolicy="no-referrer" />
+          <div>
+            <p className="text-sm font-bold text-slate-900 dark:text-white">{currentUser.name}</p>
+            <p className="text-[11px] text-slate-400">Posting to the Home feed</p>
+          </div>
+        </div>
+
+        <div>
+          <label className={label}>Title</label>
+          <input required autoFocus value={title} onChange={e => setTitle(e.target.value)} maxLength={140} placeholder="e.g. Galaxy S21 boot-loops after screen swap" className={field} />
+        </div>
+
+        <div>
+          <label className={label}>What's going on?</label>
+          <textarea required rows={4} value={content} onChange={e => setContent(e.target.value)} maxLength={5000} placeholder="Symptoms, what you've measured, what you've tried…" className={field} />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className={label}>Device type</label>
+            <select value={category} onChange={e => setCategory(e.target.value)} className={field}>
+              {CATEGORIES.map(c => (
+                <option key={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={label}>Brand</label>
+            <input list="community-brands" value={brand} onChange={e => setBrand(e.target.value)} maxLength={40} placeholder="e.g. Samsung" className={field} />
+            <datalist id="community-brands">
+              {BRANDS.map(b => (
+                <option key={b} value={b} />
+              ))}
+            </datalist>
+          </div>
+          <div>
+            <label className={label}>Model / IC</label>
+            <input value={model} onChange={e => setModel(e.target.value)} maxLength={60} placeholder="e.g. SM-G991B" className={field} />
+          </div>
+        </div>
+
+        {/* Photo */}
+        <div>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => onFile(e.target.files?.[0])} />
+          {image ? (
+            <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700">
+              <img src={image} alt="Attachment preview" className="w-full max-h-64 object-cover" />
+              <button type="button" onClick={() => setImage(null)} aria-label="Remove photo" className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={processing}
+              className="w-full py-4 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-emerald-400 text-xs font-semibold text-slate-500 flex items-center justify-center gap-2 transition-colors"
+            >
+              {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4 text-emerald-500" />}
+              {processing ? 'Preparing photo…' : 'Add a photo (optional)'}
+            </button>
+          )}
+          {error && <p className="text-xs text-rose-500 mt-1">{error}</p>}
+        </div>
+
+        <div className="pt-2 flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-bold">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={submitting || processing || !title.trim() || !content.trim()}
+            className={`px-5 py-2.5 rounded-xl ${themeConfig?.primaryBg || 'bg-indigo-600'} ${themeConfig?.primaryText || 'text-white'} text-sm font-black shadow-md shadow-indigo-500/20 disabled:opacity-50 flex items-center gap-2`}
+          >
+            {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+            Post
+          </button>
+        </div>
+      </motion.form>
+    </motion.div>
   );
 }

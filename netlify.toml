@@ -18,11 +18,7 @@
   node_bundler = "esbuild"
   external_node_modules = ["vite"]
 
-# Send API calls to the serverless Express app
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/api/:splat"
-  status = 200
+# /api/* is routed to the serverless Express app via the function's own `config.path`.
 
 # SPA fallback so deep links like /devices/tv/samsung load on refresh
 [[redirects]]

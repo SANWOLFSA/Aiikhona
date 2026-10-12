@@ -71,7 +71,7 @@ function AiTutor({ topic, onClose }: { topic: TheoryTopic; onClose: () => void }
         <div className="flex items-center gap-2">
           <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-500 text-white flex items-center justify-center"><Bot className="w-4 h-4" /></span>
           <div>
-            <p className="text-sm font-black text-slate-900 dark:text-white">AI tutor</p>
+            <p className="text-sm font-bold text-slate-900 dark:text-white">AI tutor</p>
             <p className="text-[11px] text-slate-500">Ask anything about {topic.title}</p>
           </div>
         </div>
@@ -184,7 +184,7 @@ export default function TopicDetail({
 
       <header className={`${card} space-y-3`}>
         <p className="text-xs font-bold text-emerald-600 dark:text-emerald-300">{subject?.emoji} {subject?.label}</p>
-        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">{topic.title}</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">{topic.title}</h1>
         <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">{topic.summary}</p>
         <div className="flex flex-wrap items-center gap-2">
           <LevelPills levels={topic.levels} />
@@ -199,19 +199,19 @@ export default function TopicDetail({
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <div className="lg:col-span-3 space-y-4">
           <section className={card}>
-            <h2 className="flex items-center gap-2 font-black text-slate-900 dark:text-white mb-2"><Lightbulb className="w-4 h-4 text-amber-500" /> Explanation</h2>
+            <h2 className="flex items-center gap-2 font-bold text-slate-900 dark:text-white mb-2"><Lightbulb className="w-4 h-4 text-amber-500" /> Explanation</h2>
             <div className="space-y-3 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
               {topic.explanation.map((p, i) => <p key={i}>{p}</p>)}
             </div>
           </section>
 
           <section className={card}>
-            <h2 className="flex items-center gap-2 font-black text-slate-900 dark:text-white mb-3"><ListChecks className="w-4 h-4 text-indigo-500" /> Worked example</h2>
+            <h2 className="flex items-center gap-2 font-bold text-slate-900 dark:text-white mb-3"><ListChecks className="w-4 h-4 text-indigo-500" /> Worked example</h2>
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{topic.example.problem}</p>
             <ol className="mt-3 space-y-2">
               {topic.example.steps.map((s, i) => (
                 <li key={i} className="flex gap-2.5 text-sm text-slate-700 dark:text-slate-300">
-                  <span className="w-5 h-5 shrink-0 rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-200 text-[11px] font-black flex items-center justify-center mt-0.5">{i + 1}</span>
+                  <span className="w-5 h-5 shrink-0 rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-200 text-[11px] font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
                   <span className="font-mono text-[13px] leading-relaxed">{s}</span>
                 </li>
               ))}
@@ -222,7 +222,7 @@ export default function TopicDetail({
 
         <div className="lg:col-span-2 space-y-4">
           <section className={card}>
-            <h2 className="flex items-center gap-2 font-black text-slate-900 dark:text-white mb-3"><Sigma className="w-4 h-4 text-violet-500" /> Key formulas</h2>
+            <h2 className="flex items-center gap-2 font-bold text-slate-900 dark:text-white mb-3"><Sigma className="w-4 h-4 text-violet-500" /> Key formulas</h2>
             <ul className="space-y-2">
               {topic.formulas.map((f, i) => (
                 <li key={i} className="rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 px-3 py-2">
@@ -234,17 +234,17 @@ export default function TopicDetail({
           </section>
 
           <section className={card}>
-            <h2 className="flex items-center gap-2 font-black text-slate-900 dark:text-white mb-2"><AlertTriangle className="w-4 h-4 text-rose-500" /> Common mistakes</h2>
+            <h2 className="flex items-center gap-2 font-bold text-slate-900 dark:text-white mb-2"><AlertTriangle className="w-4 h-4 text-rose-500" /> Common mistakes</h2>
             <ul className="space-y-1.5">
               {topic.mistakes.map((m, i) => (
-                <li key={i} className="flex gap-2 text-sm text-slate-700 dark:text-slate-300"><span className="text-rose-500 font-black">✗</span><span>{m}</span></li>
+                <li key={i} className="flex gap-2 text-sm text-slate-700 dark:text-slate-300"><span className="text-rose-500 font-bold">✗</span><span>{m}</span></li>
               ))}
             </ul>
           </section>
 
           {related.length > 0 && (
             <section className={card}>
-              <h2 className="flex items-center gap-2 font-black text-slate-900 dark:text-white mb-2"><Link2 className="w-4 h-4 text-emerald-500" /> Related topics</h2>
+              <h2 className="flex items-center gap-2 font-bold text-slate-900 dark:text-white mb-2"><Link2 className="w-4 h-4 text-emerald-500" /> Related topics</h2>
               <div className="flex flex-wrap gap-1.5">
                 {related.map(r => (
                   <button key={r.id} onClick={() => onOpenTopic(r.id)} className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-indigo-50 hover:text-indigo-700 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-200">
@@ -258,7 +258,7 @@ export default function TopicDetail({
           <button onClick={onStartExam} className="w-full rounded-2xl border border-emerald-200 dark:border-emerald-400/30 bg-emerald-50 dark:bg-emerald-400/10 p-3.5 text-left flex items-center gap-3 hover:shadow-md transition-shadow">
             <Timer className="w-5 h-5 text-emerald-600 dark:text-emerald-300" />
             <span>
-              <span className="block text-sm font-black text-slate-900 dark:text-white">Practise {subjectLabel(topic.subject)}</span>
+              <span className="block text-sm font-bold text-slate-900 dark:text-white">Practise {subjectLabel(topic.subject)}</span>
               <span className="block text-[11px] text-slate-500">Open the Exam Room</span>
             </span>
           </button>

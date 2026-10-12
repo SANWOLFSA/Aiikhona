@@ -22,7 +22,7 @@ export default function DeviceCommunityPanel({ device, keyParts = [] }: { device
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <section className={`${card} p-5 space-y-3 lg:col-span-2`}>
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-2"><BookOpen className="w-4 h-4 text-indigo-500" /> Community guides & teardowns</h2>
+          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><BookOpen className="w-4 h-4 text-indigo-500" /> Community guides & teardowns</h2>
           <RouteLink to={`/guides/new?${qs}`} className={btnPrimary}><Plus className="w-3.5 h-3.5" /> Create a guide</RouteLink>
         </div>
         {err && <p className="text-xs text-rose-600">{err}</p>}
@@ -49,10 +49,10 @@ export default function DeviceCommunityPanel({ device, keyParts = [] }: { device
       </section>
 
       <section className={`${card} p-5 space-y-3`}>
-        <h2 className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-2"><Package className="w-4 h-4 text-emerald-500" /> Parts & tools for this device</h2>
+        <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Package className="w-4 h-4 text-emerald-500" /> Parts & tools for this device</h2>
         <div className="flex flex-wrap gap-1.5">
           <RouteLink to={`/marketplace?q=${encodeURIComponent(device.label)}`} className={btnGhost}><ShoppingBag className="w-3.5 h-3.5" /> Verified sellers</RouteLink>
-          <RouteLink to={`/parts?q=${encodeURIComponent(device.label)}`} className={btnGhost}>Spare parts</RouteLink>
+          <RouteLink to={`/marketplace?q=${encodeURIComponent(device.label)}`} className={btnGhost}>Spare parts</RouteLink>
         </div>
         <div className="space-y-2">
           {partTerms.map((p) => (
@@ -69,7 +69,7 @@ export default function DeviceCommunityPanel({ device, keyParts = [] }: { device
 
       <section className={`${card} p-5 space-y-3 lg:col-span-3`}>
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-2"><MessageSquare className="w-4 h-4 text-indigo-500" /> Answers for {device.label}</h2>
+          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><MessageSquare className="w-4 h-4 text-indigo-500" /> Answers for {device.label}</h2>
           <RouteLink to={`/answers/ask?${qs}`} className={btnPrimary}><Plus className="w-3.5 h-3.5" /> Ask a question</RouteLink>
         </div>
         {questions === null ? <p className="text-xs text-slate-500">Loading questions…</p> : questions.length === 0 ? (
@@ -78,7 +78,7 @@ export default function DeviceCommunityPanel({ device, keyParts = [] }: { device
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {questions.slice(0, 8).map((q) => (
               <RouteLink key={q.id} to={`/answers/q/${q.id}`} className="flex items-center gap-3 py-2.5 group">
-                <div className={`w-12 text-center rounded-lg py-1 text-xs font-black ${q.acceptedAnswerId ? 'bg-emerald-500 text-white' : q.answerCount ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                <div className={`w-12 text-center rounded-lg py-1 text-xs font-bold ${q.acceptedAnswerId ? 'bg-emerald-500 text-white' : q.answerCount ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
                   {q.answerCount}<div className="text-[9px] font-bold uppercase">{q.acceptedAnswerId ? 'solved' : 'answers'}</div>
                 </div>
                 <div className="min-w-0 flex-1">

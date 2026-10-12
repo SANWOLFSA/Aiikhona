@@ -133,7 +133,7 @@ export default function TheoryLibrary({
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="font-black text-slate-900 dark:text-white">{l.label}</span>
+                <span className="font-bold text-slate-900 dark:text-white">{l.label}</span>
                 <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300">{levelCounts(l.id)} topics</span>
               </div>
               <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">{l.description}</p>
@@ -213,14 +213,14 @@ export default function TheoryLibrary({
           <nav className="flex flex-wrap gap-1" aria-label="Jump to letter">
             {byLetter.map(([ch]) => (
               <a key={ch} href={`#theory-az-${ch}`} onClick={e => { e.preventDefault(); document.getElementById(`theory-az-${ch}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-black text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-500/10">
+                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-500/10">
                 {ch}
               </a>
             ))}
           </nav>
           {byLetter.map(([ch, items]) => (
             <section key={ch} id={`theory-az-${ch}`} className="scroll-mt-48">
-              <h2 className="text-lg font-black text-indigo-600 dark:text-indigo-300 mb-2">{ch}</h2>
+              <h2 className="text-lg font-bold text-indigo-600 dark:text-indigo-300 mb-2">{ch}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                 {items.map(t => <TopicCard key={t.id} t={t} />)}
               </div>
@@ -233,7 +233,7 @@ export default function TheoryLibrary({
             <section key={meta.id}>
               <div className="flex items-end justify-between gap-3 mb-2">
                 <div>
-                  <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">{meta.emoji} {meta.label}</h2>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">{meta.emoji} {meta.label}</h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">{meta.blurb}</p>
                 </div>
                 <span className="text-[11px] font-bold text-slate-400 shrink-0">{items.length}</span>

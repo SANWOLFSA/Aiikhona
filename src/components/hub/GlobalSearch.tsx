@@ -21,7 +21,7 @@ function Group({ title, icon, rows, more }: { title: string; icon: ReactNode; ro
   if (!rows.length) return null;
   return (
     <section className={`${card} overflow-hidden`}>
-      <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-800 text-xs font-black uppercase tracking-wider text-slate-500 flex items-center justify-between">
+      <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-800 text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
         <span className="flex items-center gap-2">{icon}{title} · {rows.length}</span>
         {more && <RouteLink to={more.to} className="normal-case tracking-normal text-indigo-600 hover:underline">{more.label}</RouteLink>}
       </div>
@@ -98,7 +98,7 @@ export default function GlobalSearch({ onOpenAuth }: { onOpenAuth?: () => void }
       key: `v${v.id}`, to: v.pagePath, title: v.title, sub: `Repair video · ${v.deviceLabel}`, icon: <Video className="w-4 h-4 text-rose-500" />,
     }));
     const parts: Row[] = initialParts.filter((p) => matchesQuery(`${p.partNumber} ${p.name} ${p.category} ${p.typicalDevices.join(' ')}`, term)).map((p) => ({
-      key: `sp${p.id}`, to: `/parts?q=${encodeURIComponent(p.partNumber)}`, title: `${p.partNumber} · ${p.name}`, sub: `Spare part · ${p.category}`, icon: <Package className="w-4 h-4 text-amber-500" />,
+      key: `sp${p.id}`, to: `/components/${encodeURIComponent(p.partNumber)}`, title: `${p.partNumber} · ${p.name}`, sub: `Spare part · ${p.category}`, icon: <Package className="w-4 h-4 text-amber-500" />,
     }));
     const brd: Row[] = boards.map((b) => ({
       key: `b${b.id}`, to: boardPath(b.number), title: b.displayNumber, sub: `PCB board · ${b.photoCount} photos${b.manufacturer ? ` · ${b.manufacturer}` : ''}`, icon: <CircuitBoard className="w-4 h-4 text-emerald-500" />,
@@ -113,8 +113,8 @@ export default function GlobalSearch({ onOpenAuth }: { onOpenAuth?: () => void }
 
   return (
     <PageShell>
-      <div className="rounded-3xl p-6 bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 text-white shadow-xl space-y-4">
-        <h1 className="text-2xl font-black">Search everything electronic</h1>
+      <div className="rounded-3xl p-6 ds-hero text-white shadow-xl space-y-4">
+        <h1 className="text-2xl font-bold">Search everything electronic</h1>
         <p className="text-sm text-indigo-100/80">Devices, models, part numbers, PCB boards, guides, teardowns, answers and videos. If it exists, we can build a page for it.</p>
         <div className="relative max-w-3xl">
           <Search className="w-4 h-4 absolute left-4 top-3.5 text-slate-400 pointer-events-none" />
@@ -131,7 +131,7 @@ export default function GlobalSearch({ onOpenAuth }: { onOpenAuth?: () => void }
             { to: '/answers', icon: <MessageSquare className="w-5 h-5 text-indigo-500" />, t: 'Answers', d: 'Ask the community' },
             { to: '/teardowns', icon: <Sparkles className="w-5 h-5 text-indigo-500" />, t: 'Teardowns', d: 'See inside devices' },
           ].map((x) => (
-            <RouteLink key={x.to} to={x.to} className={`${card} p-4 flex items-center gap-3 hover:border-indigo-500`}>{x.icon}<div><div className="text-sm font-black">{x.t}</div><div className="text-[11px] text-slate-500">{x.d}</div></div></RouteLink>
+            <RouteLink key={x.to} to={x.to} className={`${card} p-4 flex items-center gap-3 hover:border-indigo-500`}>{x.icon}<div><div className="text-sm font-bold">{x.t}</div><div className="text-[11px] text-slate-500">{x.d}</div></div></RouteLink>
           ))}
         </div>
       ) : (

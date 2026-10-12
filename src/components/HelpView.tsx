@@ -22,30 +22,30 @@ export default function HelpView({ onNavigate }: { onNavigate?: (tab: string) =>
   ];
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
+    <div className="ds-page space-y-8">
       {/* Header */}
       <div className="flex items-center gap-3 pb-6 border-b border-stone-200 dark:border-stone-800">
-        <div className="w-12 h-12 rounded-2xl bg-amber-400 text-stone-950 flex items-center justify-center font-black shadow-lg">
+        <div className="w-12 h-12 rounded-2xl bg-cobalt-600 text-white flex items-center justify-center font-bold shadow-lg">
           <HelpCircle className="w-6 h-6" />
         </div>
         <div>
-          <h1 className="text-xl font-black text-stone-900 dark:text-stone-100">Help & Support Center</h1>
+          <h1 className="text-xl font-bold text-stone-900 dark:text-stone-100">Help & Support Center</h1>
           <p className="text-xs text-stone-500 dark:text-stone-400">Frequently asked questions, documentation, and technical support</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <button type="button" onClick={() => onNavigate?.('guides')} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 shadow-sm space-y-3 text-left hover:border-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors block w-full">
+        <button type="button" onClick={() => onNavigate?.('guides')} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 shadow-sm space-y-3 text-left hover:border-cobalt-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cobalt-500 transition-colors block w-full">
           <BookOpen className="w-6 h-6 text-amber-500" />
           <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100">Repair Guides</h3>
           <p className="text-xs text-stone-500">Step-by-step repair, soldering and multimeter guides.</p>
         </button>
-        <button type="button" onClick={() => onNavigate?.('forum')} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 shadow-sm space-y-3 text-left hover:border-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors block w-full">
+        <button type="button" onClick={() => onNavigate?.('home')} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 shadow-sm space-y-3 text-left hover:border-cobalt-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cobalt-500 transition-colors block w-full">
           <MessageSquare className="w-6 h-6 text-amber-500" />
           <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100">Community Forum</h3>
           <p className="text-xs text-stone-500">Ask other repairers about a fault you're stuck on.</p>
         </button>
-        <a href={`mailto:${SUPPORT_EMAIL}`} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 shadow-sm space-y-3 text-left hover:border-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors block w-full">
+        <a href={`mailto:${SUPPORT_EMAIL}`} className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 shadow-sm space-y-3 text-left hover:border-cobalt-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cobalt-500 transition-colors block w-full">
           <Mail className="w-6 h-6 text-amber-500" />
           <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100">Contact Support</h3>
           <p className="text-xs text-stone-500 break-all">Email us at {SUPPORT_EMAIL}</p>
@@ -53,7 +53,7 @@ export default function HelpView({ onNavigate }: { onNavigate?: (tab: string) =>
       </div>
 
       <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-8 shadow-sm space-y-6">
-        <h3 className="text-base font-black text-stone-900 dark:text-stone-100">Frequently Asked Questions</h3>
+        <h3 className="text-base font-bold text-stone-900 dark:text-stone-100">Frequently Asked Questions</h3>
         <div className="space-y-4">
           {faqs.map((faq, i) => (
             <div key={i} className="p-4 rounded-2xl bg-stone-50 dark:bg-stone-950/50 border border-stone-100 dark:border-stone-800 space-y-1">

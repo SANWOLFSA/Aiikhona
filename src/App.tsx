@@ -1,16 +1,12 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import Header from './components/Header';
-import Navigation from './components/Navigation';
 import Sidebar from './components/Sidebar';
 import PhonesPage from './components/PhonesPage';
 import RepairGuides from './components/RepairGuides';
 import GuideDetail from './components/GuideDetail';
 import DiagnosticTool from './components/DiagnosticTool';
 import CircuitLab from './components/CircuitLab';
-import SpareParts from './components/SpareParts';
 import Marketplace from './components/Marketplace';
-import Courses from './components/Courses';
-import Forum from './components/Forum';
 import UserProgress from './components/UserProgress';
 import AuthModal from './components/AuthModal';
 import LandingPage from './components/LandingPage';
@@ -33,15 +29,32 @@ const HubRoutes = lazy(() => import('./components/hub/HubRoutes'));
 import { useAdminStatus } from './lib/admin';
 import { usePendingVerificationsCount } from './lib/marketplace';
 import { storage } from './lib/storage';
-import { APP_THEMES, DEFAULT_THEME_ID, getNextThemeId } from './lib/theme';
+import { APP_THEMES, DEFAULT_THEME_ID } from './lib/theme';
 import { auth, db, isFirebaseConfigured } from './lib/firebase';
 import { onAuthStateChanged, signOut, type User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { initialGuides, initialParts, initialCourses, initialPosts } from './data';
-import type { UserProfile, Guide, SparePart, Course, ForumPost } from './types';
+import { initialGuides, initialCourses, initialPosts } from './data';
+import type { UserProfile, Guide, ForumPost } from './types';
 
-const ROUTED_TABS = ['home', 'devices', 'phones', 'blueprint_viewer', '3d_viewer', 'social_annotator', 'guides', 'diagnostic', 'circuit', 'parts', 'marketplace', 'studies', 'theory', 'multimeter', 'forum', 'ai_assistant', 'user_db', 'file_storage', 'settings', 'about', 'help', 'progress', 'admin', 'search', 'device', 'components', 'answers', 'teardowns', 'contributors'];
-const TAB_ALIASES: Record<string, string> = { learning: 'studies', electrical_theory: 'theory', exam_room: 'theory' };
+const ROUTED_TABS = ['home', 'devices', 'phones', 'blueprint_viewer', '3d_viewer', 'social_annotator', 'guides', 'diagnostic', 'circuit', 'marketplace', 'theory', 'multimeter', 'ai_assistant', 'user_db', 'file_storage', 'settings', 'about', 'help', 'progress', 'admin', 'search', 'device', 'components', 'answers', 'teardowns', 'contributors'];
+const TAB_ALIASES: Record<string, string> = { learning: 'theory', studies: 'theory', courses: 'theory', electrical_theory: 'theory', exam_room: 'theory', forum: 'home', parts: 'components', spare_parts: 'components' };
+/**
+ * Old routes that were merged into another page. They redirect (replace) to the canonical URL:
+ *   /studies, /learning, /courses -> /theory#/theory/courses  (Courses merged into Theory)
+ *   /electrical-theory, /exam-room -> /theory
+ *   /forum -> /  (the Home feed is the community forum, backed by Firestore)
+ *   /parts -> /components  (part-number reference lives on Component pages)
+ */
+const LEGACY_REDIRECTS: Record<string, string> = {
+  '/studies': '/theory#/theory/courses',
+  '/learning': '/theory#/theory/courses',
+  '/courses': '/theory#/theory/courses',
+  '/electrical-theory': '/theory',
+  '/exam-room': '/theory#/theory/exam',
+  '/forum': '/',
+  '/parts': '/components',
+  '/spare-parts': '/components',
+};
 function pathForTab(tab: string): string {
   const t = TAB_ALIASES[tab] || tab;
   return t === 'home' ? '/' : `/${t.replace(/_/g, '-')}`;
@@ -51,6 +64,7 @@ function isHubPath(pathname: string): boolean {
   return /^\/(search|device|components|answers|teardowns|contributors)(\/|$)/.test(pathname) || /^\/guides\/(new|edit|view)(\/|$)/.test(pathname);
 }
 const hubFallback = <div className="p-10 text-center text-sm text-slate-500">Loading…</div>;
+const SIDEBAR_COLLAPSED_KEY = 'diy_sidebar_collapsed';
 function tabFromPath(pathname: string): string {
   const seg = (pathname.split('/')[1] || '').replace(/-/g, '_');
   const t = TAB_ALIASES[seg] || seg;
@@ -60,7 +74,7 @@ function tabFromPath(pathname: string): string {
 
 export default function App() {
   const [darkMode, setDarkMode] = useState<boolean>(() => storage.getDarkMode());
-  const [themeId, setThemeId] = useState<string>(() => storage.getAppTheme());
+  const themeId = DEFAULT_THEME_ID;
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => storage.getIsAuthenticated());
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => storage.getUserProfile());
   // Main tabs are synced with the URL path (/devices, /guides, /marketplace, ...) so links are shareable
@@ -76,8 +90,6 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   
   const [guides, setGuides] = useState<Guide[]>(initialGuides);
-  const [parts, setParts] = useState<SparePart[]>(initialParts);
-  const [courses, setCourses] = useState<Course[]>(initialCourses);
   const [posts, setPosts] = useState<ForumPost[]>(initialPosts);
   // Admin UI visibility comes from Firebase (claim / admins doc / users.role, or the
   // VITE_ADMIN_EMAILS bootstrap list). Real authority is enforced by the security rules.
@@ -91,19 +103,28 @@ export default function App() {
   const [selectedGuide, setSelectedGuide] = useState<Guide | null>(null);
   const [initialSearchQuery, setInitialSearchQuery] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'; } catch { return false; }
+  });
+  const toggleSidebarCollapsed = () => {
+    setIsSidebarCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
+  };
 
   const currentTheme = APP_THEMES[themeId] || APP_THEMES[DEFAULT_THEME_ID];
 
-  const handleCycleTheme = () => {
-    const next = getNextThemeId(themeId);
-    setThemeId(next);
-    storage.setAppTheme(next);
-  };
-
-  const handleSelectTheme = (newThemeId: string) => {
-    setThemeId(newThemeId);
-    storage.setAppTheme(newThemeId);
-  };
+  // Merged / retired routes redirect to their canonical page.
+  useEffect(() => {
+    const target = LEGACY_REDIRECTS[pathname];
+    if (target) {
+      window.history.replaceState({}, '', target + (urlSearch.toString() && !target.includes('#') ? `?${urlSearch.toString()}` : ''));
+      window.dispatchEvent(new Event('app:navigate'));
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    }
+  }, [pathname, urlSearch]);
   
   useEffect(() => {
     if (darkMode) {
@@ -166,9 +187,10 @@ export default function App() {
     storage.saveUserProfile(updatedUser);
   };
 
+  // "Source this part" opens the marketplace pre-searched for the part (Spare Parts was merged away).
   const handleSourcePart = (partNumber: string) => {
     setInitialSearchQuery(partNumber);
-    setActiveTab('parts');
+    navigate(`/marketplace?q=${encodeURIComponent(partNumber)}`);
   };
 
   const handleSelectMarketplace = (brand: string) => {
@@ -274,73 +296,44 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200 flex flex-col font-sans antialiased">
+    <div className="min-h-[100dvh] w-full bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans antialiased">
       {isOfflineMode && (
-        <div className="bg-slate-900 text-slate-200 border-b border-slate-800 px-4 py-2 text-xs font-semibold flex items-center justify-center gap-2 shadow-xs z-50">
-          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><line x1="2" x2="22" y1="2" y2="22"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M2 8.82a15 15 0 0 1 4.17-2.65"/><path d="M10.66 5c4.01-.36 8.14.9 11.34 3.82"/><path d="M16 12.5a5 5 0 0 1 3 4.5"/><path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg>
-          <span className="tracking-wide">OFFLINE VAULT ACTIVE: Accessing {savedGuideIds.length} verified technical manuals cached locally.</span>
+        <div className="bg-slate-950 text-slate-200 border-b border-slate-800 px-4 py-2 text-xs font-medium flex items-center justify-center gap-3 z-50">
+          <span>Offline vault: showing the {savedGuideIds.length} guide{savedGuideIds.length === 1 ? '' : 's'} you saved on this device.</span>
+          <button type="button" onClick={() => setIsOfflineMode(false)} className="px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 font-semibold">Show everything</button>
         </div>
       )}
 
-      <Header 
-        currentUser={currentUser}
-        darkMode={darkMode}
-        onToggleDarkMode={() => setDarkMode(!darkMode)}
-        isOfflineMode={isOfflineMode}
-        onToggleOfflineMode={() => setIsOfflineMode(!isOfflineMode)}
-        savedGuidesCount={savedGuideIds.length}
-        onOpenAuth={() => setIsAuthModalOpen(true)}
-        onSignOut={handleSignOut}
+      <Header
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onSelectTab={setActiveTab}
-        activeTab={activeTab}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-        themeConfig={currentTheme}
-        onCycleTheme={handleCycleTheme}
+        onToggleCollapse={toggleSidebarCollapsed}
         logSearch={logSearch}
       />
-      
-      <Navigation 
-        activeTab={activeTab} 
-        onSelectTab={(tabId: string) => {
-          if (tabId === 'admin' && !isAdmin) return;
-          setActiveTab(tabId);
-          setInitialSearchQuery(''); // Clear cross-tab triggers
-        }} 
-        pendingVerificationsCount={pendingVerificationsCount}
-        currentUser={currentUser}
-        isAdmin={isAdmin}
-        themeConfig={currentTheme}
-      />
-      
-      <div className="flex flex-1 min-h-0">
-        <Sidebar 
-          activeTab={activeTab} 
+
+      <div className="flex flex-1 min-h-0 w-full">
+        <Sidebar
+          activeTab={activeTab}
           onSelectTab={(tabId: string) => {
             if (tabId === 'admin' && !isAdmin) return;
-            if (tabId === 'devices') setActiveTab('devices');
-            else if (tabId === 'learning') setActiveTab('studies');
-            else if (tabId === 'marketplace') setActiveTab('marketplace');
-            else if (tabId === 'forum') setActiveTab('forum');
-            else if (tabId === 'ai_assistant') setActiveTab('ai_assistant');
-            else if (tabId === 'user_db') setActiveTab('user_db');
-            else if (tabId === 'file_storage') setActiveTab('file_storage');
-            else if (tabId === 'settings') setActiveTab('settings');
-            else if (tabId === 'about') setActiveTab('about');
-            else if (tabId === 'help') setActiveTab('help');
-            else setActiveTab(tabId);
+            setActiveTab(tabId);
             setInitialSearchQuery('');
           }}
           isOpen={isSidebarOpen}
           onCloseMobile={() => setIsSidebarOpen(false)}
+          collapsed={isSidebarCollapsed}
           currentUser={currentUser}
           isAdmin={isAdmin}
           pendingVerificationsCount={pendingVerificationsCount}
-          themeConfig={currentTheme}
+          darkMode={darkMode}
+          onToggleDarkMode={() => setDarkMode(!darkMode)}
+          onOpenAccount={() => setIsAuthModalOpen(true)}
+          onSignOut={handleSignOut}
         />
-        
-        <main className="flex-1 w-full pb-16 min-w-0 max-w-7xl mx-auto">
+
+        <main className="flex-1 w-full min-w-0 pb-16">
           {activeTab === 'not_found' && <NotFound onGoHome={() => setActiveTab('home')} />}
           {activeTab === 'home' && (
             <HomeFeed 
@@ -407,14 +400,6 @@ export default function App() {
           
           {activeTab === 'circuit' && <CircuitLab />}
           
-          {activeTab === 'parts' && (
-            <SpareParts 
-              parts={parts} 
-              initialSearchQuery={initialSearchQuery || searchQuery || urlQ} 
-              onSelectMarketplace={handleSelectMarketplace}
-            />
-          )}
-          
           {activeTab === 'marketplace' && (
             <Marketplace 
               initialSearchQuery={initialSearchQuery || searchQuery || urlQ} 
@@ -426,7 +411,7 @@ export default function App() {
 
           {activeTab === 'theory' && (
             <Suspense fallback={<div className="p-10 text-center text-sm text-slate-500">Loading Electrical Theory…</div>}>
-              <TheoryHub themeConfig={currentTheme} />
+              <TheoryHub themeConfig={currentTheme} courses={initialCourses} onCourseComplete={handleCourseComplete} />
             </Suspense>
           )}
 
@@ -434,23 +419,6 @@ export default function App() {
             <Suspense fallback={<div className="p-10 text-center text-sm text-slate-500">Loading Multimeter Lab…</div>}>
               <MultimeterPage themeConfig={currentTheme} />
             </Suspense>
-          )}
-
-          {activeTab === 'studies' && (
-            <Courses 
-              courses={courses}
-              onCourseComplete={handleCourseComplete}
-            />
-          )}
-
-          {activeTab === 'forum' && (
-            <Forum 
-              posts={posts}
-              currentUser={currentUser}
-              onAddPost={handleAddPost}
-              onAddReply={handleAddReply}
-              onToggleLike={handleToggleLike}
-            />
           )}
 
           {activeTab === 'ai_assistant' && (
@@ -474,9 +442,10 @@ export default function App() {
                 setCurrentUser(updatedUser);
                 storage.saveUserProfile(updatedUser);
               }}
-              themeId={themeId}
-              onSelectTheme={handleSelectTheme}
-              onCycleTheme={handleCycleTheme}
+              isOfflineMode={isOfflineMode}
+              onToggleOfflineMode={() => setIsOfflineMode(!isOfflineMode)}
+              savedGuidesCount={savedGuideIds.length}
+              onSignOut={handleSignOut}
             />
           )}
 

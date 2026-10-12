@@ -102,7 +102,8 @@ async function requireFirebaseUser(req: express.Request, res: express.Response, 
 
 // Free-tier keys have no Google Search grounding quota. When it is exhausted we answer from the
 // model's own knowledge instead, and tell the model so (prompts that say "use Google Search" still work).
-let groundingBlockedUntil = 0;
+// Grounding is off unless GEMINI_GROUNDING=on (set it once the Google project has billing / grounding quota).
+let groundingBlockedUntil = process.env.GEMINI_GROUNDING === 'on' ? 0 : Number.POSITIVE_INFINITY;
 const UNGROUNDED_NOTE = 'NOTE: Live web search is unavailable right now. Answer from your own training knowledge instead. Wherever the instructions say "supported by the search results" read it as "that you know with high confidence". Set "found": true when you confidently recognise this exact item; still never invent part numbers, ratings or pinouts you are unsure of (use null or [] instead).';
 function withoutSearchNote(contents: any) {
   if (!Array.isArray(contents)) return contents;

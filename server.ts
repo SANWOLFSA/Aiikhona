@@ -142,6 +142,14 @@ async function callGeminiWithCascade(
     }
   }
 
+  // Free-tier projects often have no quota for grounding tools (Google Search/Maps).
+  // If every grounded attempt was rate-limited, retry once without tools so users still get an answer.
+  const lastMsg = String(lastError?.message || lastError || '');
+  if (tools && (lastMsg.includes('429') || lastMsg.includes('RESOURCE_EXHAUSTED') || lastMsg.includes('quota'))) {
+    console.warn('Grounded Gemini calls were rate-limited; retrying without tools.');
+    return callGeminiWithCascade(ai, contents, systemInstruction, undefined, extraConfig, onResponse);
+  }
+
   throw lastError || new Error("All candidate Gemini models were unavailable.");
 }
 

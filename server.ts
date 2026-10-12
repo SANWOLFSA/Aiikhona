@@ -109,9 +109,9 @@ async function callGeminiWithCascade(
   extraConfig?: Record<string, any>,
   onResponse?: (response: any) => void
 ): Promise<string> {
-  // Ordered cascade: gemini-3.5-flash (required for search/maps), gemini-3.8-flash, gemini-3.5-flash-lite
+  // Ordered cascade: gemini-3.8-flash, gemini-3.5-flash-lite, gemini-3.1-flash-lite (ids per ai.google.dev/gemini-api/docs/models, Oct 2026)
   // (gemini-3.1-flash-lite is scheduled for shutdown on 2027-05-07: https://ai.google.dev/gemini-api/docs/deprecations)
-  const models = ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite'];
+  const models = ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
   let lastError: any = null;
 
   for (const model of models) {

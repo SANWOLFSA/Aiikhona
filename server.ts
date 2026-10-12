@@ -122,12 +122,17 @@ async function callGeminiWithCascade(
 ): Promise<string> {
   // Ordered cascade: gemini-3.8-flash, gemini-3.5-flash-lite, gemini-3.1-flash-lite (ids per ai.google.dev/gemini-api/docs/models, Oct 2026)
   // (gemini-3.1-flash-lite is scheduled for shutdown on 2027-05-07: https://ai.google.dev/gemini-api/docs/deprecations)
-  const models = ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
+  // Lookups that lost grounding use the fast lite models first so they finish inside Netlify's 30s limit.
+  const fast = !!extraConfig?.__fast;
+  if (fast) { extraConfig = { ...extraConfig }; delete extraConfig.__fast; if (!Object.keys(extraConfig).length) extraConfig = undefined; }
+  const models = fast
+    ? ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.8-flash']
+    : ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
   let lastError: any = null;
 
   // If grounding quota was recently exhausted, skip the grounded attempt entirely (fast answers on free tier).
   if (tools && Date.now() < groundingBlockedUntil) {
-    return callGeminiWithCascade(ai, withoutSearchNote(contents), systemInstruction, undefined, extraConfig, onResponse);
+    return callGeminiWithCascade(ai, withoutSearchNote(contents), systemInstruction, undefined, { ...(extraConfig || {}), __fast: true }, onResponse);
   }
 
   for (const model of models) {
@@ -164,7 +169,7 @@ async function callGeminiWithCascade(
   if (tools && (lastMsg.includes('429') || lastMsg.includes('RESOURCE_EXHAUSTED') || lastMsg.includes('quota'))) {
     console.warn('Grounded Gemini calls were rate-limited; retrying without tools for the next 15 minutes.');
     groundingBlockedUntil = Date.now() + 15 * 60 * 1000;
-    return callGeminiWithCascade(ai, withoutSearchNote(contents), systemInstruction, undefined, extraConfig, onResponse);
+    return callGeminiWithCascade(ai, withoutSearchNote(contents), systemInstruction, undefined, { ...(extraConfig || {}), __fast: true }, onResponse);
   }
 
   throw lastError || new Error("All candidate Gemini models were unavailable.");

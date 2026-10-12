@@ -1,141 +1,173 @@
-import { GraduationCap, Home, Smartphone, BookOpen, ShoppingBag, MessageSquare, Bot, Settings, Info, HelpCircle, Wrench, ShieldCheck, FileText, Search, Microchip, ScanSearch, Award } from 'lucide-react';
+import {
+  GraduationCap, Home, Smartphone, BookOpen, ShoppingBag, Bot, Settings, Info, HelpCircle, ShieldCheck,
+  FileText, Search, Microchip, ScanSearch, Award, Activity, Cpu, Gauge, LogOut, Moon, Sun, TrendingUp, Wrench, X,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { UserProfile } from '../types';
-import type { ThemeConfig } from '../lib/theme';
 
 interface SidebarProps {
   activeTab: string;
   onSelectTab: (tab: string) => void;
+  /** Mobile drawer open state. */
   isOpen: boolean;
   onCloseMobile: () => void;
+  /** Desktop: icon-only rail. */
+  collapsed?: boolean;
   currentUser: UserProfile;
   /** From useAdminStatus().isAdmin; never decided by email here. */
   isAdmin?: boolean;
   pendingVerificationsCount?: number;
-  themeConfig?: ThemeConfig;
+  darkMode: boolean;
+  onToggleDarkMode: () => void;
+  onOpenAccount: () => void;
+  onSignOut: () => void;
 }
 
-export default function Sidebar({ activeTab, onSelectTab, isOpen, onCloseMobile, isAdmin = false, pendingVerificationsCount, themeConfig }: SidebarProps) {
-  const menuItems: any[] = [
-    { id: 'home', label: 'Home Feed', icon: Home, description: 'Community forum posts & updates', highlight: true },
-    { id: 'phones', label: 'Phones Page', icon: Smartphone, description: 'AI troubleshooting & tricks', highlight: true },
-    { id: 'blueprint_viewer', label: 'Boardview & Blueprints', icon: FileText, description: 'Realistic boardviews, OEM schematics & blueprints', highlight: true },
-    { id: 'search', label: 'Search everything', icon: Search, description: 'Any device, part number, guide or answer', highlight: true },
-    { id: 'devices', label: 'Devices', icon: Smartphone, description: 'Repair guides & diagnostics' },
-    { id: 'guides', label: 'Repair guides', icon: BookOpen, description: 'Step-by-step community guides' },
-    { id: 'answers', label: 'Answers', icon: HelpCircle, description: 'Q&A for every device' },
-    { id: 'teardowns', label: 'Teardowns', icon: ScanSearch, description: 'See inside devices' },
-    { id: 'components', label: 'Components', icon: Microchip, description: 'Specs, pinouts, datasheets, equivalents' },
-    { id: 'contributors', label: 'Top fixers', icon: Award, description: 'Reputation & badges' },
-    { id: 'theory', label: 'Electrical Theory', icon: GraduationCap, description: 'Theory A–Z & Exam Room', highlight: true },
-    { id: 'learning', label: 'Learning', icon: BookOpen, description: 'Electrical courses & exams' },
-    { id: 'marketplace', label: 'Market place', icon: ShoppingBag, description: 'Verified parts & tools' },
-    { id: 'forum', label: 'Community forum', icon: MessageSquare, description: 'Tech discussions & help' },
-    { id: 'ai_assistant', label: 'SANWOLF AI', icon: Bot, description: 'Smart repair copilot', highlight: true },
-    { id: 'settings', label: 'Settings', icon: Settings, description: 'Preferences & theme selection' },
-    { id: 'about', label: 'About', icon: Info, description: 'Mission & e-waste impact' },
-    { id: 'help', label: 'Help', icon: HelpCircle, description: 'FAQ & support docs' },
+type Item = { id: string; label: string; icon: LucideIcon; badge?: number; match?: string[] };
+type Group = { title: string; items: Item[] };
+
+export default function Sidebar({
+  activeTab, onSelectTab, isOpen, onCloseMobile, collapsed = false, currentUser, isAdmin = false,
+  pendingVerificationsCount, darkMode, onToggleDarkMode, onOpenAccount, onSignOut,
+}: SidebarProps) {
+  const groups: Group[] = [
+    {
+      title: 'Discover',
+      items: [
+        { id: 'home', label: 'Community feed', icon: Home },
+        { id: 'search', label: 'Search', icon: Search },
+      ],
+    },
+    {
+      title: 'Repair',
+      items: [
+        { id: 'devices', label: 'Devices', icon: Smartphone },
+        { id: 'phones', label: 'Phone fixes', icon: Wrench },
+        { id: 'guides', label: 'Repair guides', icon: BookOpen },
+        { id: 'teardowns', label: 'Teardowns', icon: ScanSearch },
+        { id: 'answers', label: 'Answers', icon: HelpCircle },
+        { id: 'diagnostic', label: 'AI diagnostic', icon: Activity },
+        { id: 'ai_assistant', label: 'SANWOLF AI', icon: Bot },
+        { id: 'blueprint_viewer', label: 'Boardview & blueprints', icon: FileText, match: ['3d_viewer', 'social_annotator'] },
+      ],
+    },
+    {
+      title: 'Parts & tools',
+      items: [
+        { id: 'marketplace', label: 'Marketplace', icon: ShoppingBag },
+        { id: 'components', label: 'Components', icon: Microchip },
+        { id: 'multimeter', label: 'Multimeter lab', icon: Gauge },
+        { id: 'circuit', label: 'Circuit lab', icon: Cpu },
+      ],
+    },
+    {
+      title: 'Learn',
+      items: [{ id: 'theory', label: 'Theory & courses', icon: GraduationCap }],
+    },
+    {
+      title: 'You',
+      items: [
+        { id: 'progress', label: 'My progress', icon: TrendingUp },
+        { id: 'contributors', label: 'Top fixers', icon: Award },
+        ...(isAdmin
+          ? [{
+              id: 'admin', label: 'Admin desk', icon: ShieldCheck,
+              badge: pendingVerificationsCount && pendingVerificationsCount > 0 ? pendingVerificationsCount : undefined,
+            }]
+          : []),
+        { id: 'settings', label: 'Settings', icon: Settings },
+        { id: 'help', label: 'Help', icon: HelpCircle },
+        { id: 'about', label: 'About', icon: Info },
+      ],
+    },
   ];
 
-  // Admin Desk is restricted exclusively to admins
-  if (isAdmin) {
-    menuItems.push({
-      id: 'admin',
-      label: 'Admin Desk',
-      icon: ShieldCheck,
-      description: 'Review merchant verifications',
-      badge: pendingVerificationsCount && pendingVerificationsCount > 0 ? pendingVerificationsCount : undefined
-    });
-  }
+  const go = (id: string) => {
+    onSelectTab(id);
+    onCloseMobile();
+  };
+
+  // On mobile the drawer is always full width; "collapsed" only applies from lg up.
+  const c = collapsed;
+  const rowBase = 'w-full flex items-center gap-3 rounded-lg text-[13px] font-medium transition-colors text-left';
+  const rowPad = c ? 'px-3 py-2 lg:justify-center lg:px-0' : 'px-3 py-2';
+  const hideWhenCollapsed = c ? 'lg:hidden' : '';
 
   return (
     <>
-      {/* Mobile Backdrop */}
       {isOpen && (
-        <div 
-          onClick={onCloseMobile}
-          className="fixed inset-0 bg-stone-900/50 backdrop-blur-xs z-45 lg:hidden"
-        />
+        <div onClick={onCloseMobile} className="fixed inset-0 bg-slate-950/40 backdrop-blur-[2px] z-[45] lg:hidden" aria-hidden />
       )}
 
-      <aside className={`fixed lg:sticky top-0 lg:top-16 left-0 h-screen lg:h-[calc(100vh-4rem)] w-72 bg-white dark:bg-slate-950 border-r border-slate-200/80 dark:border-slate-800/80 z-50 flex flex-col transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-        {/* Sidebar Header / Logo area */}
-        <div className="p-5 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-xl ${themeConfig?.primaryBg || 'bg-indigo-600'} text-white flex items-center justify-center font-bold shadow-xs`}>
-              <Wrench className="w-4.5 h-4.5 text-white" />
-            </div>
-            <div>
-              <h2 className="font-bold text-slate-900 dark:text-white tracking-tight text-sm">DIYELECTRONICS</h2>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{themeConfig?.bannerTag || 'Hardware & Telemetry Systems'}</p>
-            </div>
-          </div>
+      <aside
+        aria-label="Main navigation"
+        className={`fixed lg:sticky top-0 lg:top-14 left-0 z-50 lg:z-30 h-[100dvh] lg:h-[calc(100dvh-3.5rem)] shrink-0 w-[272px] ${c ? 'lg:w-[68px]' : 'lg:w-[248px]'} bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col transition-[transform,width] duration-200 ease-out ${isOpen ? 'translate-x-0 shadow-2xl lg:shadow-none' : '-translate-x-full lg:translate-x-0'}`}
+      >
+        {/* Mobile drawer header */}
+        <div className="lg:hidden h-14 px-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
+          <span className="flex items-center gap-2.5">
+            <span className="w-8 h-8 rounded-lg bg-slate-950 dark:bg-white flex items-center justify-center">
+              <Wrench className="w-4 h-4 text-white dark:text-slate-950" />
+            </span>
+            <span className="text-[15px] font-semibold tracking-tight text-slate-950 dark:text-white">DIY Electronics</span>
+          </span>
+          <button type="button" onClick={onCloseMobile} className="p-2 -mr-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close menu">
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* Navigation List */}
-        <div className="flex-1 overflow-y-auto px-3.5 py-5 space-y-1 no-scrollbar">
-          <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Operations & Lab
-          </div>
-
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id || 
-              (item.id === 'devices' && (activeTab === 'guides' || activeTab === 'diagnostic' || activeTab === 'circuit' || activeTab === 'progress')) ||
-              (item.id === 'learning' && activeTab === 'studies') ||
-              (item.id === 'marketplace' && (activeTab === 'marketplace' || activeTab === 'parts'));
-
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onSelectTab(item.id);
-                  onCloseMobile();
-                }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all group relative text-left ${
-                  isActive 
-                    ? (themeConfig?.activeNavBg || 'bg-indigo-600 text-white shadow-sm') 
-                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/70 hover:text-slate-950 dark:hover:text-white'
-                }`}
-              >
-                <div className={`w-8 h-8 rounded-md flex items-center justify-center transition-colors shrink-0 ${
-                  isActive 
-                    ? (themeConfig?.activeNavIconBg || 'bg-indigo-800 text-white') 
-                    : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 group-hover:bg-slate-200 dark:group-hover:bg-slate-700'
-                }`}>
-                  <Icon className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="truncate">{item.label}</span>
-                    <div className="flex items-center gap-1.5">
-                      {item.badge && (
-                        <span className="px-1.5 py-0.5 rounded bg-red-600 text-white text-[10px] font-bold">{item.badge}</span>
-                      )}
-                      {item.highlight && !isActive && (
-                        <span className={`w-1.5 h-1.5 rounded-full ${themeConfig?.indicatorBg || 'bg-indigo-500'}`}></span>
-                      )}
-                    </div>
-                  </div>
-                  <p className={`text-[10px] font-normal truncate mt-0.5 ${isActive ? 'text-white/80' : 'text-slate-400 dark:text-slate-500'}`}>
-                    {item.description}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Sidebar Footer / Eco Impact Widget */}
-        <div className="p-3.5 border border-slate-200/80 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-900/60 m-3.5 rounded-xl">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
-              🌿
+        <nav className="flex-1 overflow-y-auto no-scrollbar px-3 py-3 space-y-4">
+          {groups.map(group => (
+            <div key={group.title} className="space-y-0.5">
+              <div className={`px-3 pb-1 text-[11px] font-medium text-slate-400 dark:text-slate-500 ${hideWhenCollapsed}`}>{group.title}</div>
+              {c && <div className="hidden lg:block mx-3 mb-1 border-t border-slate-100 dark:border-slate-800/70 first:hidden" />}
+              {group.items.map(item => {
+                const Icon = item.icon;
+                const active = activeTab === item.id || (item.match?.includes(activeTab) ?? false);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => go(item.id)}
+                    title={c ? item.label : undefined}
+                    aria-current={active ? 'page' : undefined}
+                    className={`${rowBase} ${rowPad} relative ${
+                      active
+                        ? 'bg-slate-100 text-slate-950 dark:bg-slate-800/80 dark:text-white'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 hover:text-slate-950 dark:hover:bg-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <Icon className={`w-[18px] h-[18px] shrink-0 ${active ? 'text-cobalt-600 dark:text-cobalt-400' : ''}`} strokeWidth={1.9} />
+                    <span className={`truncate flex-1 ${hideWhenCollapsed}`}>{item.label}</span>
+                    {item.badge && (
+                      <span className={`px-1.5 py-0.5 rounded-md bg-red-600 text-white text-[10px] font-semibold ${c ? 'lg:absolute lg:top-0.5 lg:right-1' : ''}`}>{item.badge}</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-bold text-slate-900 dark:text-slate-100 truncate">ESG Compliance</p>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">Right to Repair Standards</p>
-            </div>
-          </div>
+          ))}
+        </nav>
+
+        {/* Footer: account, appearance, sign out (always last) */}
+        <div className="border-t border-slate-200 dark:border-slate-800 p-3 space-y-0.5">
+          <button type="button" onClick={() => { onOpenAccount(); onCloseMobile(); }} title={c ? currentUser.name : undefined}
+            className={`${rowBase} ${rowPad} text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900`}>
+            <img src={currentUser.avatar} alt="" className="w-[22px] h-[22px] rounded-full object-cover shrink-0 ring-1 ring-slate-200 dark:ring-slate-700" />
+            <span className={`flex-1 min-w-0 ${hideWhenCollapsed}`}>
+              <span className="block truncate font-medium">{currentUser.name}</span>
+            </span>
+          </button>
+          <button type="button" onClick={onToggleDarkMode} title={c ? (darkMode ? 'Light mode' : 'Dark mode') : undefined} aria-pressed={darkMode}
+            className={`${rowBase} ${rowPad} text-slate-600 dark:text-slate-400 hover:bg-slate-50 hover:text-slate-950 dark:hover:bg-slate-900 dark:hover:text-white`}>
+            {darkMode ? <Sun className="w-[18px] h-[18px] shrink-0" strokeWidth={1.9} /> : <Moon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.9} />}
+            <span className={`flex-1 ${hideWhenCollapsed}`}>{darkMode ? 'Light mode' : 'Dark mode'}</span>
+          </button>
+          <button type="button" onClick={() => { onCloseMobile(); onSignOut(); }} title={c ? 'Sign out' : undefined}
+            className={`${rowBase} ${rowPad} text-slate-600 dark:text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400`}>
+            <LogOut className="w-[18px] h-[18px] shrink-0" strokeWidth={1.9} />
+            <span className={`flex-1 ${hideWhenCollapsed}`}>Sign out</span>
+          </button>
         </div>
       </aside>
     </>

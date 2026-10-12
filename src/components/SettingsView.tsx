@@ -1,266 +1,179 @@
 import { useState } from 'react';
-import { Settings, Moon, Sun, Bell, User, CheckCircle2, Heart, Palette, Sparkles } from 'lucide-react';
-import { APP_THEMES, DEFAULT_THEME_ID, THEME_ORDER } from '../lib/theme';
+import { Moon, Sun, User, CheckCircle2, Heart, Palette, HardDrive, LogOut } from 'lucide-react';
 
 interface SettingsViewProps {
   darkMode: boolean;
   onToggleDarkMode: () => void;
   currentUser: any;
   onUpdateUser?: (user: any) => void;
-  themeId?: string;
-  onSelectTheme?: (themeId: string) => void;
-  onCycleTheme?: () => void;
+  /** "Offline vault": show only guides saved on this device. */
+  isOfflineMode?: boolean;
+  onToggleOfflineMode?: () => void;
+  savedGuidesCount?: number;
+  onSignOut?: () => void;
 }
 
 const AVAILABLE_BRANDS = [
-  "Apple", "Samsung", "Sony", "LG", "Dyson", "Philips", "Nintendo", "Microsoft", "Dell", "HP", "Lenovo", "Asus", "Panasonic"
+  'Apple', 'Samsung', 'Sony', 'LG', 'Dyson', 'Philips', 'Nintendo', 'Microsoft', 'Dell', 'HP', 'Lenovo', 'Asus', 'Panasonic',
 ];
 
-export default function SettingsView({ 
-  darkMode, 
-  onToggleDarkMode, 
-  currentUser, 
+const card = 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs';
+
+function Section({ icon, title, subtitle, children }: { icon: React.ReactNode; title: string; subtitle: string; children: React.ReactNode }) {
+  return (
+    <section className={`${card} p-5 sm:p-6`}>
+      <div className="flex items-start gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+        <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center shrink-0">{icon}</div>
+        <div>
+          <h2 className="text-sm font-semibold text-slate-950 dark:text-white">{title}</h2>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400">{subtitle}</p>
+        </div>
+      </div>
+      <div className="pt-4">{children}</div>
+    </section>
+  );
+}
+
+function Toggle({ on, onClick, label }: { on: boolean; onClick?: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={onClick}
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${on ? 'bg-cobalt-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+    >
+      <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${on ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+    </button>
+  );
+}
+
+export default function SettingsView({
+  darkMode,
+  onToggleDarkMode,
+  currentUser,
   onUpdateUser,
-  themeId = DEFAULT_THEME_ID,
-  onSelectTheme,
-  onCycleTheme
+  isOfflineMode = false,
+  onToggleOfflineMode,
+  savedGuidesCount = 0,
+  onSignOut,
 }: SettingsViewProps) {
   const [savedMessage, setSavedMessage] = useState(false);
-  const [notifications, setNotifications] = useState(true);
-  const [offlineSync, setOfflineSync] = useState(true);
   const [favoriteBrands, setFavoriteBrands] = useState<string[]>(currentUser?.favoriteBrands || []);
 
-  const handleSave = () => {
-    if (onUpdateUser) {
-      onUpdateUser({
-        ...currentUser,
-        favoriteBrands
-      });
-    }
-    setSavedMessage(true);
-    setTimeout(() => setSavedMessage(false), 3000);
-  };
-
   const toggleBrand = (brand: string) => {
-    setFavoriteBrands(prev => 
-      prev.includes(brand) ? prev.filter(b => b !== brand) : [...prev, brand]
-    );
+    const next = favoriteBrands.includes(brand) ? favoriteBrands.filter(b => b !== brand) : [...favoriteBrands, brand];
+    setFavoriteBrands(next);
+    onUpdateUser?.({ ...currentUser, favoriteBrands: next });
+    setSavedMessage(true);
+    window.setTimeout(() => setSavedMessage(false), 2000);
   };
-
-  const activeThemeConfig = APP_THEMES[themeId] || APP_THEMES[DEFAULT_THEME_ID];
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between pb-6 border-b border-slate-200 dark:border-slate-800">
-        <div className="flex items-center gap-3">
-          <div className={`w-12 h-12 rounded-2xl ${activeThemeConfig.primaryBg} text-white flex items-center justify-center font-black shadow-sm`}>
-            <Settings className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">App Settings</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Manage your workspace preferences, appearance, themes, and sync settings</p>
-          </div>
+    <div className="ds-page space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">Settings</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Appearance, offline guides, favourite brands and your account.</p>
         </div>
         {savedMessage && (
-          <div className="flex items-center gap-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-4 py-2 rounded-xl text-xs font-bold animate-fade-in">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>Settings saved successfully!</span>
+          <div role="status" className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 text-xs font-medium">
+            <CheckCircle2 className="w-4 h-4" /> Saved
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        {/* Appearance & Themes */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 shadow-xs space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
-                <Palette className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Workspace Themes & Styling</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Choose your active engineering color profile or cycle to the next theme</p>
-              </div>
-            </div>
-
-            {onCycleTheme && (
-              <button
-                onClick={onCycleTheme}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-colors"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-                <span>Next Theme</span>
-              </button>
-            )}
-          </div>
-
-          {/* Theme Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
-            {THEME_ORDER.map((tId) => {
-              const cfg = APP_THEMES[tId];
-              const isSelected = themeId === tId;
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <Section icon={<Palette className="w-[18px] h-[18px]" />} title="Appearance" subtitle="Graphite & Cobalt theme, in light or dark.">
+          <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Colour mode">
+            {[
+              { id: false, label: 'Light', icon: <Sun className="w-4 h-4" /> },
+              { id: true, label: 'Dark', icon: <Moon className="w-4 h-4" /> },
+            ].map(opt => {
+              const selected = darkMode === opt.id;
               return (
-                <div
-                  key={tId}
-                  onClick={() => onSelectTheme && onSelectTheme(tId)}
-                  className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
-                    isSelected
-                      ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 ring-2 ring-blue-500/30'
-                      : 'border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/50 hover:border-slate-300 dark:hover:border-slate-700'
-                  }`}
+                <button
+                  key={opt.label}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => { if (!selected) onToggleDarkMode(); }}
+                  className={`rounded-xl border p-3 text-left transition-colors ${selected ? 'border-cobalt-500 ring-4 ring-cobalt-500/15' : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'}`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-slate-900 dark:text-white">{cfg.name}</span>
-                    <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${cfg.headerBadgeBg} ${cfg.headerBadgeText} border ${cfg.headerBadgeBorder}`}>
-                      {cfg.badge}
-                    </span>
+                  <div className={`h-16 rounded-lg mb-3 border ${opt.id ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'} p-2 flex gap-1.5`}>
+                    <div className={`w-6 rounded ${opt.id ? 'bg-slate-900' : 'bg-white border border-slate-200'}`} />
+                    <div className="flex-1 space-y-1.5">
+                      <div className={`h-2 w-3/4 rounded ${opt.id ? 'bg-slate-700' : 'bg-slate-300'}`} />
+                      <div className={`h-2 w-1/2 rounded ${opt.id ? 'bg-slate-800' : 'bg-slate-200'}`} />
+                      <div className="h-3 w-10 rounded bg-cobalt-500" />
+                    </div>
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug mb-3">
-                    {cfg.description}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <span className={`w-4 h-4 rounded-full ${cfg.primaryBg} border border-white/20 inline-block shadow-2xs`}></span>
-                    <span className="text-[10px] text-slate-600 dark:text-slate-400 font-medium">
-                      {isSelected ? 'Active Profile' : 'Select Theme'}
-                    </span>
-                  </div>
-                </div>
+                  <span className="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-200">{opt.icon}{opt.label}</span>
+                </button>
               );
             })}
           </div>
+        </Section>
 
-          {/* Dark Mode Toggle */}
-          <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300">
-                {darkMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-              </div>
-              <div>
-                <p className="text-xs font-bold text-slate-900 dark:text-white">Dark Mode Contrast</p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">High-contrast laboratory dark mode for component soldering</p>
-              </div>
+        <Section icon={<HardDrive className="w-[18px] h-[18px]" />} title="Offline vault" subtitle="Guides you save are cached on this device.">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-slate-900 dark:text-white">Show saved guides only</p>
+              <p className="text-[13px] text-slate-500 dark:text-slate-400">{savedGuidesCount} guide{savedGuidesCount === 1 ? '' : 's'} saved. Turn on when you are working without a connection.</p>
             </div>
+            <Toggle on={isOfflineMode} onClick={onToggleOfflineMode} label="Show saved guides only" />
+          </div>
+        </Section>
+
+        <Section icon={<Heart className="w-[18px] h-[18px]" />} title="Favourite brands" subtitle="Saved to your profile on this device.">
+          <div className="flex flex-wrap gap-2">
+            {AVAILABLE_BRANDS.map(brand => {
+              const isSelected = favoriteBrands.includes(brand);
+              return (
+                <button
+                  key={brand}
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() => toggleBrand(brand)}
+                  className={`px-3 py-1.5 rounded-lg text-[13px] font-medium border transition-colors ${
+                    isSelected
+                      ? 'bg-cobalt-600 text-white border-cobalt-600'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
+                >
+                  {brand}
+                </button>
+              );
+            })}
+          </div>
+        </Section>
+
+        <Section icon={<User className="w-[18px] h-[18px]" />} title="Account" subtitle="Your profile on DIY Electronics.">
+          <dl className="text-sm divide-y divide-slate-100 dark:divide-slate-800">
+            <div className="flex justify-between gap-4 py-2.5">
+              <dt className="text-slate-500 dark:text-slate-400">Name</dt>
+              <dd className="font-medium text-slate-900 dark:text-white truncate">{currentUser?.name || '—'}</dd>
+            </div>
+            <div className="flex justify-between gap-4 py-2.5">
+              <dt className="text-slate-500 dark:text-slate-400">Email</dt>
+              <dd className="font-medium text-slate-900 dark:text-white truncate">{currentUser?.email || '—'}</dd>
+            </div>
+            <div className="flex justify-between gap-4 py-2.5">
+              <dt className="text-slate-500 dark:text-slate-400">Role</dt>
+              <dd className="font-medium text-slate-900 dark:text-white truncate">{currentUser?.role || '—'}</dd>
+            </div>
+          </dl>
+          {onSignOut && (
             <button
-              onClick={onToggleDarkMode}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${darkMode ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+              type="button"
+              onClick={onSignOut}
+              className="mt-4 inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium border border-slate-200 dark:border-slate-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
             >
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${darkMode ? 'translate-x-6' : 'translate-x-1'}`} />
+              <LogOut className="w-4 h-4" /> Sign out
             </button>
-          </div>
-        </div>
-
-        {/* Notifications & Offline */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 shadow-xs space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
-              <Bell className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Notifications & Offline Bench</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Configure real-time alerts and offline cache settings</p>
-            </div>
-          </div>
-
-          <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-bold text-slate-900 dark:text-white">Community Notifications</p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">Receive alerts when someone replies to your forum posts</p>
-              </div>
-              <button
-                onClick={() => setNotifications(!notifications)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${notifications ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${notifications ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-bold text-slate-900 dark:text-white">Auto Offline Sync</p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">Automatically download favorited repair manuals for offline use</p>
-              </div>
-              <button
-                onClick={() => setOfflineSync(!offlineSync)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${offlineSync ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${offlineSync ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Favorite Brands */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 shadow-xs space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center">
-              <Heart className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Favorite Device Ecosystems</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Prioritize these brands in your parts and repair feeds</p>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-            <div className="flex flex-wrap gap-2">
-              {AVAILABLE_BRANDS.map(brand => {
-                const isSelected = favoriteBrands.includes(brand);
-                return (
-                  <button
-                    key={brand}
-                    onClick={() => toggleBrand(brand)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                      isSelected
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300'
-                    }`}
-                  >
-                    {brand}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Account Info */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 shadow-xs space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-              <User className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Account Profile</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Your technician credentials and organization</p>
-            </div>
-          </div>
-
-          <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800 text-xs">
-            <div className="flex justify-between py-2 border-b border-slate-100 dark:border-slate-800">
-              <span className="text-slate-500 dark:text-slate-400">Name</span>
-              <span className="font-semibold text-slate-900 dark:text-white">{currentUser?.name || 'Technician'}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-slate-100 dark:border-slate-800">
-              <span className="text-slate-500 dark:text-slate-400">Email</span>
-              <span className="font-semibold text-slate-900 dark:text-white">{currentUser?.email}</span>
-            </div>
-            <div className="flex justify-between py-2">
-              <span className="text-slate-500 dark:text-slate-400">Role</span>
-              <span className="font-semibold text-slate-900 dark:text-white">{currentUser?.role || 'Senior Repair Tech'}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-end pt-2">
-          <button
-            onClick={handleSave}
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
-          >
-            Save Preferences
-          </button>
-        </div>
+          )}
+        </Section>
       </div>
     </div>
   );

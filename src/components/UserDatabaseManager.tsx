@@ -392,7 +392,7 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
                       className={`w-full px-4 py-3 pr-10 rounded-xl text-xs transition-all border ${
                         (fileNameTouched || attemptedSubmit)
                           ? validationRules.isFileNameValid
-                            ? 'bg-emerald-50/20 dark:bg-emerald-950/20 border-emerald-500 text-stone-900 dark:text-stone-100 focus:ring-2 focus:ring-emerald-400'
+                            ? 'bg-emerald-50/20 dark:bg-emerald-950/20 border-emerald-500 text-stone-900 dark:text-stone-100 focus:ring-2 focus:ring-cobalt-500/30'
                             : 'bg-rose-50/20 dark:bg-rose-950/20 border-rose-500 text-stone-900 dark:text-stone-100 focus:ring-2 focus:ring-rose-400'
                           : 'bg-stone-50 dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-cobalt-500'
                       }`}

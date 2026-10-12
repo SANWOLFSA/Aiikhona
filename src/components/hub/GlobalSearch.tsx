@@ -119,7 +119,7 @@ export default function GlobalSearch({ onOpenAuth }: { onOpenAuth?: () => void }
         <div className="relative max-w-3xl">
           <Search className="w-4 h-4 absolute left-4 top-3.5 text-slate-400 pointer-events-none" />
           <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. Galaxy A15 charging port, LG F4J6 washer, IRF540N, 820-02016, Omron M3"
-            className="w-full pl-11 pr-4 py-3 rounded-2xl text-sm bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-emerald-400/40" />
+            className="w-full pl-11 pr-4 py-3 rounded-2xl text-sm bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-cobalt-500/30" />
         </div>
       </div>
 
@@ -140,7 +140,7 @@ export default function GlobalSearch({ onOpenAuth }: { onOpenAuth?: () => void }
             <div className="text-sm text-slate-600 dark:text-slate-300"><b>{total}</b> results for “{term}”. {total === 0 ? 'Nothing saved yet, but we can research it now:' : 'Not what you need? Research it directly:'}</div>
             <div className="flex flex-wrap gap-2">
               {!hasExactDevice && <RouteLink to={`/device/${slug}?q=${encodeURIComponent(term)}`} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700"><Globe2 className="w-3.5 h-3.5" /> Device page for “{term}”</RouteLink>}
-              {pn.length >= 2 && <RouteLink to={`/components/${encodeURIComponent(pn)}?q=${encodeURIComponent(term)}`} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600"><Cpu className="w-3.5 h-3.5" /> Component “{pn}”</RouteLink>}
+              {pn.length >= 2 && <RouteLink to={`/components/${encodeURIComponent(pn)}?q=${encodeURIComponent(term)}`} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-950 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"><Cpu className="w-3.5 h-3.5" /> Component “{pn}”</RouteLink>}
               {partLike && <RouteLink to={boardPath(term)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200"><CircuitBoard className="w-3.5 h-3.5" /> PCB board “{pn}”</RouteLink>}
             </div>
           </div>

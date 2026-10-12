@@ -428,7 +428,7 @@ export default function GuideDetail({
             <button 
               disabled={repairLogged}
               onClick={handleLogRepairComplete}
-              className="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs transition-colors flex items-center gap-1.5 shadow-md disabled:opacity-50"
+              className="px-6 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 font-bold text-xs transition-colors flex items-center gap-1.5 shadow-md disabled:opacity-50"
             >
               <Award className="w-4 h-4" />
               <span>{repairLogged ? "Repair Logged Successfully!" : "Log Successful Repair"}</span>

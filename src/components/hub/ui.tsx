@@ -8,7 +8,7 @@ import { RouteLink } from '../../hooks/usePathname';
 export const card = 'bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs';
 export const input = 'w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500';
 export const btnPrimary = 'inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
-export const btnMint = 'inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
+export const btnMint = 'inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-slate-950 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
 export const btnGhost = 'inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-50 transition-colors';
 export const btnDanger = 'inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 text-rose-700 dark:text-rose-300 disabled:opacity-50 transition-colors';
 
@@ -33,7 +33,7 @@ export function Hero({ eyebrow, title, subtitle, children }: { eyebrow: string; 
   return (
     <div className="rounded-3xl p-6 sm:p-8 ds-hero text-white shadow-xl space-y-4">
       <div className="space-y-2 max-w-3xl">
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-400/15 border border-emerald-300/30 text-emerald-200 text-[11px] font-bold uppercase tracking-wider">{eyebrow}</span>
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-slate-200 text-[11px] font-medium">{eyebrow}</span>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{title}</h1>
         {subtitle && <p className="text-sm text-indigo-100/80">{subtitle}</p>}
       </div>

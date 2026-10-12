@@ -428,7 +428,7 @@ function VerificationCard({ app, actor, expanded, onToggle }: { app: SellerVerif
                 <button
                   disabled={busy || !requiredChecked}
                   onClick={() => act('approved')}
-                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs transition-colors inline-flex items-center gap-1.5 disabled:opacity-50"
+                  className="px-4 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 font-bold text-xs transition-colors inline-flex items-center gap-1.5 disabled:opacity-50"
                 >
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <BadgeCheck className="w-4 h-4" />} Approve & verify
                 </button>
@@ -554,7 +554,7 @@ function ModerationRow({ listing, actor }: { listing: ListingDoc; actor: Actor |
         )}
         <div className="flex flex-wrap gap-1.5 pt-1">
           {listing.status !== 'active' && !removing && (
-            <button disabled={busy} onClick={() => run(a => adminModerateListing(listing, 'active', a))} className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold inline-flex items-center gap-1 disabled:opacity-50">
+            <button disabled={busy} onClick={() => run(a => adminModerateListing(listing, 'active', a))} className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 text-xs font-bold inline-flex items-center gap-1 disabled:opacity-50">
               <CheckCircle2 className="w-3.5 h-3.5" /> Approve
             </button>
           )}

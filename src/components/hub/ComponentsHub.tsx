@@ -65,7 +65,7 @@ function ComponentsHome() {
         <form onSubmit={(e) => { e.preventDefault(); go(); }} className="flex gap-2 max-w-2xl">
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400 pointer-events-none" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Part number, e.g. IRF540N, LM7805, TPS54331, STM32F103C8T6" className="w-full pl-9 pr-3 py-2.5 rounded-xl text-sm bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-emerald-400/40" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Part number, e.g. IRF540N, LM7805, TPS54331, STM32F103C8T6" className="w-full pl-9 pr-3 py-2.5 rounded-xl text-sm bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-cobalt-500/30" />
           </div>
           <button className={btnPrimary} disabled={normalizePartNumber(q).length < 2}>Look up</button>
         </form>

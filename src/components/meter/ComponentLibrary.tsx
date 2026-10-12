@@ -15,7 +15,7 @@ export default function ComponentLibrary() {
         <label className="relative flex-1">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${METER_COMPONENTS.length} components — e.g. "mosfet", "7805", "geyser element", "bulged cap"`}
-            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-400" />
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cobalt-500/30" />
         </label>
       </div>
       <div className="flex flex-wrap gap-1.5">

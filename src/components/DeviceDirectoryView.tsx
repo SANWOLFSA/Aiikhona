@@ -151,7 +151,7 @@ export default function DeviceDirectoryView({
   }, [crumbs.map((c) => c.label).join('|')]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div className="ds-page space-y-6">
       {/* Top bar: breadcrumbs + back */}
       <div className={`${card} p-4 flex flex-col md:flex-row md:items-center justify-between gap-3`}>
         <nav aria-label="Breadcrumb" className="flex items-center flex-wrap gap-1 text-xs font-semibold text-stone-500 dark:text-stone-400 min-w-0">
@@ -246,12 +246,12 @@ function RootView({ base }: { base: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl p-6 sm:p-8 bg-gradient-to-br from-blue-900 via-indigo-900 to-stone-900 text-white shadow-xl space-y-5">
+      <div className="rounded-3xl p-6 sm:p-8 ds-hero text-white shadow-xl space-y-5">
         <div className="space-y-2 max-w-3xl">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-[11px] font-black uppercase tracking-wider">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-[11px] font-bold uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5" /> Repair workbench directory
           </span>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">What are we fixing today?</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">What are we fixing today?</h1>
           <p className="text-sm text-blue-100/80">Pick a device type, then the brand, model and size to get step-by-step fault finding with multimeter checks, parts and safety notes.</p>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -262,7 +262,7 @@ function RootView({ base }: { base: string }) {
             ['Repair pages', CATALOG_STATS.leaves],
           ].map(([label, n]) => (
             <div key={label as string} className="rounded-2xl bg-white/10 border border-white/10 px-4 py-3">
-              <div className="text-xl font-black">{(n as number).toLocaleString()}</div>
+              <div className="text-xl font-bold">{(n as number).toLocaleString()}</div>
               <div className="text-[11px] uppercase font-bold tracking-wider text-blue-100/70">{label}</div>
             </div>
           ))}
@@ -324,7 +324,7 @@ function RootView({ base }: { base: string }) {
       ) : (
         groups.map(({ g, types }) => (
           <section key={g} className="space-y-3">
-            <h2 className="text-xs font-black uppercase tracking-wider text-stone-500 dark:text-stone-400 flex items-center gap-2">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 flex items-center gap-2">
               <Layers className="w-4 h-4" /> {g} <span className="text-stone-300 dark:text-stone-600">· {types.length}</span>
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -332,7 +332,7 @@ function RootView({ base }: { base: string }) {
                 <RouteLink key={t.key} to={`${base}/${t.slug}`} className={`${card} p-4 flex items-center gap-3 hover:border-blue-500 hover:shadow-md transition-all group`}>
                   <DeviceTypeIcon type={t} />
                   <div className="min-w-0">
-                    <div className="text-sm font-black text-stone-900 dark:text-stone-100 group-hover:text-blue-600 leading-tight">{t.name}</div>
+                    <div className="text-sm font-bold text-stone-900 dark:text-stone-100 group-hover:text-blue-600 leading-tight">{t.name}</div>
                     <div className="text-[11px] text-stone-500 mt-0.5">{t.brands.length} brands · {t.brands.reduce((a, b) => a + b.models.length, 0)} models</div>
                   </div>
                 </RouteLink>
@@ -363,8 +363,8 @@ function LevelHeader({ tier, title, subtitle, icon, children }: { tier: string; 
       <div className="flex items-center gap-4 min-w-0">
         {icon}
         <div className="min-w-0">
-          <div className="text-[11px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400">{tier}</div>
-          <h1 className="text-xl font-black text-stone-900 dark:text-stone-100 leading-tight">{title}</h1>
+          <div className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">{tier}</div>
+          <h1 className="text-xl font-bold text-stone-900 dark:text-stone-100 leading-tight">{title}</h1>
           <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">{subtitle}</p>
         </div>
       </div>
@@ -386,7 +386,7 @@ function BrandsView({ type, typeUrl }: { type: CatalogDeviceType; typeUrl: strin
           <RouteLink key={b.slug} to={`${typeUrl}/${b.slug}`} className={`${card} p-4 flex items-center gap-3 hover:border-blue-500 hover:shadow-md transition-all group`}>
             <BrandLogo name={b.name} domain={b.domain} simpleIconSlug={b.simpleIconSlug} className="w-12 h-12" />
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-black text-stone-900 dark:text-stone-100 group-hover:text-blue-600 truncate">{b.name}</div>
+              <div className="text-sm font-bold text-stone-900 dark:text-stone-100 group-hover:text-blue-600 truncate">{b.name}</div>
               <div className="text-[11px] text-stone-500">{b.models.length} model{b.models.length === 1 ? '' : 's'}{b.domain ? ` · ${b.domain}` : ''}</div>
             </div>
             <ChevronRight className="w-4 h-4 text-stone-300 group-hover:text-blue-600" />
@@ -414,12 +414,12 @@ function ModelsView({ type, brand, brandUrl }: { type: CatalogDeviceType; brand:
             <RouteLink key={m.slug} to={to} className={`${card} p-4 flex items-center gap-4 hover:border-blue-500 hover:shadow-md transition-all group`}>
               <ModelImage query={`${brand.name} ${m.name}`} imageUrl={m.imageUrl} type={type} className="w-16 h-16" iconClassName="w-7 h-7" />
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-black text-stone-900 dark:text-stone-100 group-hover:text-blue-600">{m.name}</div>
+                <div className="text-sm font-bold text-stone-900 dark:text-stone-100 group-hover:text-blue-600">{m.name}</div>
                 <div className="flex flex-wrap gap-1.5 mt-1">
                   {m.sizes.length > 0 ? (
-                    <span className="px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 text-[10px] font-black uppercase">{m.sizes.length} sizes</span>
+                    <span className="px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 text-[10px] font-bold uppercase">{m.sizes.length} sizes</span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-[10px] font-black uppercase">Solutions</span>
+                    <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-[10px] font-bold uppercase">Solutions</span>
                   )}
                   {m.legacy?.commonIssues?.[0] && <span className="text-[11px] text-stone-500 truncate max-w-[16rem]">⚠ {m.legacy.commonIssues[0]}</span>}
                 </div>
@@ -445,7 +445,7 @@ function SizesView({ type, brand, model, modelUrl }: { type: CatalogDeviceType; 
         {model.sizes.map((s) => (
           <RouteLink key={s.slug} to={`${modelUrl}/${s.slug}`} className={`${card} p-5 text-center hover:border-blue-500 hover:shadow-md transition-all group`}>
             <Ruler className="w-5 h-5 mx-auto text-stone-400 group-hover:text-blue-600" />
-            <div className="mt-2 text-lg font-black text-stone-900 dark:text-stone-100 group-hover:text-blue-600">{s.name}</div>
+            <div className="mt-2 text-lg font-bold text-stone-900 dark:text-stone-100 group-hover:text-blue-600">{s.name}</div>
           </RouteLink>
         ))}
       </div>
@@ -511,12 +511,12 @@ function SolutionsList({ solutions, solutionsUrl, type, brand, model, size }: {
             <RouteLink key={s.id} to={`${solutionsUrl}/${s.id}`} className={`${card} p-5 hover:border-blue-500 hover:shadow-md transition-all group flex flex-col gap-2`}>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[10px] font-mono font-bold text-stone-400">#{String(i + 1).padStart(2, '0')}</span>
-                <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${DIFF_STYLE[s.difficulty]}`}>{s.difficulty}</span>
+                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${DIFF_STYLE[s.difficulty]}`}>{s.difficulty}</span>
                 <span className="text-[11px] text-stone-500 flex items-center gap-1"><Clock className="w-3 h-3" />~{s.minutes} min</span>
-                {s.source === 'model-notes' && <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">Model notes</span>}
-                {s.brandNote && <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300">{brand.name} codes</span>}
+                {s.source === 'model-notes' && <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">Model notes</span>}
+                {s.brandNote && <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300">{brand.name} codes</span>}
               </div>
-              <h3 className="text-sm font-black text-stone-900 dark:text-stone-100 group-hover:text-blue-600">{s.title}</h3>
+              <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100 group-hover:text-blue-600">{s.title}</h3>
               <p className="text-xs text-stone-600 dark:text-stone-400 line-clamp-2">{s.symptom}</p>
               <div className="text-[11px] font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1 mt-auto">Open fix guide <ChevronRight className="w-3.5 h-3.5" /></div>
             </RouteLink>
@@ -531,7 +531,7 @@ function SolutionsList({ solutions, solutionsUrl, type, brand, model, size }: {
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
     <div className={`${card} p-5 space-y-3`}>
-      <h3 className="text-xs font-black uppercase tracking-wider text-stone-900 dark:text-stone-100 flex items-center gap-2">{icon}{title}</h3>
+      <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100 flex items-center gap-2">{icon}{title}</h3>
       {children}
     </div>
   );
@@ -549,14 +549,14 @@ function SolutionDetail({ solution: s, all, solutionsUrl, type, brand, model, si
     <div className="space-y-4">
       <div className={`${card} p-5 sm:p-6 space-y-3`}>
         <div className="flex items-center gap-2 flex-wrap text-[11px]">
-          <span className={`px-2 py-0.5 rounded-md font-black uppercase ${DIFF_STYLE[s.difficulty]}`}>{s.difficulty}</span>
+          <span className={`px-2 py-0.5 rounded-md font-bold uppercase ${DIFF_STYLE[s.difficulty]}`}>{s.difficulty}</span>
           <span className="text-stone-500 flex items-center gap-1"><Clock className="w-3 h-3" />~{s.minutes} min</span>
           <span className="text-stone-400">Solution {idx + 1} of {all.length}</span>
         </div>
         <div className="flex items-start gap-4">
           <ModelImage query={`${brand.name} ${model.name}`} imageUrl={model.imageUrl} type={type} className="w-16 h-16 hidden sm:block" iconClassName="w-7 h-7" />
           <div className="min-w-0">
-            <h1 className="text-xl sm:text-2xl font-black text-stone-900 dark:text-stone-100 leading-tight">{s.title}</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-stone-900 dark:text-stone-100 leading-tight">{s.title}</h1>
             <p className="text-xs text-stone-500 mt-1">{brand.name} {model.name}{size ? ` · ${size.name}` : ''} · {type.name}</p>
           </div>
         </div>
@@ -565,22 +565,22 @@ function SolutionDetail({ solution: s, all, solutionsUrl, type, brand, model, si
 
       <div className="rounded-2xl p-4 border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 flex gap-3">
         <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-        <p className="text-xs text-rose-800 dark:text-rose-200 leading-relaxed"><span className="font-black uppercase">Safety: </span>{s.safety}</p>
+        <p className="text-xs text-rose-800 dark:text-rose-200 leading-relaxed"><span className="font-bold uppercase">Safety: </span>{s.safety}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 space-y-4">
           {s.causes.length > 0 && (
             <Section icon={<AlertTriangle className="w-4 h-4 text-amber-500" />} title="Likely causes">
-              <ul className="space-y-1.5">{s.causes.map((c, i) => <li key={i} className="text-xs text-stone-700 dark:text-stone-300 flex gap-2"><span className="text-amber-500 font-black">•</span>{c}</li>)}</ul>
+              <ul className="space-y-1.5">{s.causes.map((c, i) => <li key={i} className="text-xs text-stone-700 dark:text-stone-300 flex gap-2"><span className="text-amber-500 font-bold">•</span>{c}</li>)}</ul>
             </Section>
           )}
           <Section icon={<Gauge className="w-4 h-4 text-blue-600" />} title="Test & diagnose">
             <ol className="space-y-2.5">
               {s.tests.map((t, i) => (
                 <li key={i} className="flex gap-3 text-xs text-stone-700 dark:text-stone-300 leading-relaxed">
-                  <span className="w-6 h-6 rounded-lg bg-blue-600 text-white font-black flex items-center justify-center shrink-0">{i + 1}</span>
-                  <span>{t}{METER.test(t) && <span className="ml-2 px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-[10px] font-black uppercase">Meter</span>}</span>
+                  <span className="w-6 h-6 rounded-lg bg-blue-600 text-white font-bold flex items-center justify-center shrink-0">{i + 1}</span>
+                  <span>{t}{METER.test(t) && <span className="ml-2 px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-[10px] font-bold uppercase">Meter</span>}</span>
                 </li>
               ))}
             </ol>
@@ -589,7 +589,7 @@ function SolutionDetail({ solution: s, all, solutionsUrl, type, brand, model, si
             <ol className="space-y-2.5">
               {s.fix.map((t, i) => (
                 <li key={i} className="flex gap-3 text-xs text-stone-700 dark:text-stone-300 leading-relaxed">
-                  <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white font-black flex items-center justify-center shrink-0">{i + 1}</span><span>{t}</span>
+                  <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white font-bold flex items-center justify-center shrink-0">{i + 1}</span><span>{t}</span>
                 </li>
               ))}
             </ol>
@@ -659,7 +659,7 @@ function NotFound({ what, parent }: { what: string; parent: string }) {
   return (
     <div className={`${card} p-8 text-center space-y-3`}>
       <AlertTriangle className="w-8 h-8 mx-auto text-amber-500" />
-      <h2 className="text-lg font-black text-stone-900 dark:text-stone-100">We couldn't find that {what}</h2>
+      <h2 className="text-lg font-bold text-stone-900 dark:text-stone-100">We couldn't find that {what}</h2>
       <p className="text-xs text-stone-500">The link may be old or mistyped.</p>
       <RouteLink to={parent} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700"><ArrowLeft className="w-4 h-4" /> Go back a level</RouteLink>
     </div>
@@ -676,7 +676,7 @@ function OemHub() {
   ];
   return (
     <details className={`${card} p-5 group`}>
-      <summary className="cursor-pointer text-xs font-black uppercase tracking-wider text-stone-900 dark:text-stone-100 flex items-center gap-2">
+      <summary className="cursor-pointer text-xs font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100 flex items-center gap-2">
         <Layers className="w-4 h-4 text-blue-600" /> Universal OEM chassis cross-reference (budget & import brands)
       </summary>
       <p className="text-xs text-stone-500 mt-3">Most imported 24–55" TVs share Shenzhen combo boards and standard 3 V / 6 V backlight strips, so parts are sourced by board code rather than brand.</p>
@@ -684,7 +684,7 @@ function OemHub() {
         <table className="w-full text-left text-xs">
           <thead><tr className="border-b border-stone-200 dark:border-stone-800 text-stone-400 uppercase font-bold"><th className="py-2 px-3">Brand</th><th className="py-2 px-3">OEM chassis / board</th><th className="py-2 px-3">Shared parts</th><th className="py-2 px-3">Common symptom</th></tr></thead>
           <tbody className="divide-y divide-stone-100 dark:divide-stone-800 text-stone-700 dark:text-stone-300">
-            {rows.map((r) => <tr key={r[0]}><td className="py-2 px-3 font-black">{r[0]}</td><td className="py-2 px-3 font-mono text-blue-600 dark:text-blue-400">{r[1]}</td><td className="py-2 px-3">{r[2]}</td><td className="py-2 px-3 text-stone-500">{r[3]}</td></tr>)}
+            {rows.map((r) => <tr key={r[0]}><td className="py-2 px-3 font-bold">{r[0]}</td><td className="py-2 px-3 font-mono text-blue-600 dark:text-blue-400">{r[1]}</td><td className="py-2 px-3">{r[2]}</td><td className="py-2 px-3 text-stone-500">{r[3]}</td></tr>)}
           </tbody>
         </table>
       </div>

@@ -142,7 +142,7 @@ function BoardSearchHome({ base }: { base: string }) {
   const to = (q: string) => `${base}/board/${encodeURIComponent(normalizeBoardNumber(q))}`;
 
   return (
-    <div className="flex flex-col gap-5 max-w-5xl mx-auto w-full">
+    <div className="flex flex-col gap-5 w-full">
       <section className={`${card} p-5 sm:p-7 relative overflow-hidden`}>
         <div className="absolute -top-20 -right-16 w-64 h-64 rounded-full bg-violet-400/20 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-10 w-64 h-64 rounded-full bg-emerald-300/20 blur-3xl pointer-events-none" />
@@ -150,7 +150,7 @@ function BoardSearchHome({ base }: { base: string }) {
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900">
             <Camera className="w-3.5 h-3.5" /> Real board photos
           </span>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">Find any PCB by its board number</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Find any PCB by its board number</h1>
           <p className="text-sm text-slate-600 dark:text-slate-400 max-w-2xl">
             Type the number printed on the board. You get real photos (Wikimedia Commons and the community), cited info on ICs and common faults, and links to schematic and boardview searches. If nobody has shared your board yet, upload the first photo.
           </p>
@@ -165,7 +165,7 @@ function BoardSearchHome({ base }: { base: string }) {
       </section>
 
       <section className={`${card} p-5`}>
-        <h2 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2 mb-3"><Star className="w-4 h-4 text-amber-500" /> Featured boards</h2>
+        <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-3"><Star className="w-4 h-4 text-amber-500" /> Featured boards</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
           {FEATURED_BOARDS.map((f) => (
             <RouteLink key={f.query} to={to(f.query)} className="group rounded-2xl border border-slate-200 dark:border-slate-800 p-3 hover:border-indigo-400 dark:hover:border-indigo-600 hover:bg-indigo-50/40 dark:hover:bg-indigo-950/30 transition-colors">
@@ -179,7 +179,7 @@ function BoardSearchHome({ base }: { base: string }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <section className={`${card} p-5`}>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2"><Clock className="w-4 h-4 text-indigo-500" /> Your recent searches</h2>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2"><Clock className="w-4 h-4 text-indigo-500" /> Your recent searches</h2>
             {recent.length > 0 && <button onClick={() => { clearRecentBoardSearches(); setRecent([]); }} className="text-[11px] font-semibold text-slate-500 hover:text-rose-500">Clear</button>}
           </div>
           {recent.length ? (
@@ -192,7 +192,7 @@ function BoardSearchHome({ base }: { base: string }) {
         </section>
 
         <section className={`${card} p-5`}>
-          <h2 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2 mb-3"><Flame className="w-4 h-4 text-emerald-500" /> Popular community boards</h2>
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-3"><Flame className="w-4 h-4 text-emerald-500" /> Popular community boards</h2>
           {popularState === 'loading' && <p className="text-xs text-slate-500 flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…</p>}
           {popularState === 'error' && <p className="text-xs text-slate-500">Community boards are unavailable right now.</p>}
           {popularState === 'ok' && (popular.length ? (
@@ -334,7 +334,7 @@ function BoardResultPage({ display, base, currentUser, onOpenAuth }: { display: 
   const noPhotos = !photosLoading && commonsPhotos.length === 0 && community.length === 0;
 
   return (
-    <div className="flex flex-col gap-4 max-w-5xl mx-auto w-full">
+    <div className="flex flex-col gap-4 w-full">
       <div className="flex items-center gap-2">
         <RouteLink to={base} className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200" aria-label="Back to board search"><ArrowLeft className="w-4 h-4" /></RouteLink>
         <div className="flex-1"><SearchBox initial={board?.displayNumber || searchText} compact /></div>
@@ -347,7 +347,7 @@ function BoardResultPage({ display, base, currentUser, onOpenAuth }: { display: 
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900">Board number</span>
               {info?.boardType && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900">{info.boardType}</span>}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-slate-900 dark:text-white break-all">{titleNumber}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold font-mono tracking-tight text-slate-900 dark:text-white break-all">{titleNumber}</h1>
             <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
               {[info?.manufacturer || board?.manufacturer, (info?.devices?.length ? info.devices : board?.devices || []).slice(0, 3).join(', ')].filter(Boolean).join(' · ') || 'Real photos, cited info and schematic searches for this board.'}
             </p>
@@ -372,7 +372,7 @@ function BoardResultPage({ display, base, currentUser, onOpenAuth }: { display: 
       {/* Photo gallery */}
       <section className={`${card} p-5`}>
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <h2 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2"><ImageIcon className="w-4 h-4 text-indigo-500" /> Real photos</h2>
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2"><ImageIcon className="w-4 h-4 text-indigo-500" /> Real photos</h2>
           <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl" role="tablist" aria-label="Board side">
             {(['all', 'top', 'bottom'] as Side[]).map((s) => (
               <button key={s} role="tab" aria-selected={side === s} onClick={() => setSide(s)} className={`px-3 py-1 rounded-lg text-xs font-bold capitalize ${side === s ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-300 shadow-xs' : 'text-slate-600 dark:text-slate-400'}`}>
@@ -453,7 +453,7 @@ function BoardResultPage({ display, base, currentUser, onOpenAuth }: { display: 
         <div className="lg:col-span-3"><InfoCard info={info} loading={infoLoading} error={infoErr} /></div>
         <div className="lg:col-span-2 flex flex-col gap-4">
           <section className={`${card} p-5`}>
-            <h2 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2 mb-1"><Link2 className="w-4 h-4 text-emerald-500" /> Find schematics & boardviews</h2>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-1"><Link2 className="w-4 h-4 text-emerald-500" /> Find schematics & boardviews</h2>
             <p className="text-[11px] text-slate-500 mb-3">Searches on repair sites for this exact number. Results are not checked by us.</p>
             <ul className="space-y-1">
               {(links.length ? links : []).map((l) => (
@@ -468,7 +468,7 @@ function BoardResultPage({ display, base, currentUser, onOpenAuth }: { display: 
           </section>
 
           <section className={`${card} p-5`}>
-            <h2 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2 mb-3"><FileText className="w-4 h-4 text-violet-500" /> Community files</h2>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-3"><FileText className="w-4 h-4 text-violet-500" /> Community files</h2>
             {files.length ? (
               <ul className="space-y-2">
                 {files.map((f) => {
@@ -491,7 +491,7 @@ function BoardResultPage({ display, base, currentUser, onOpenAuth }: { display: 
 
           {related.length > 0 && (
             <section className={`${card} p-5`}>
-              <h2 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2 mb-3"><Tag className="w-4 h-4 text-indigo-500" /> Similar board numbers</h2>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-3"><Tag className="w-4 h-4 text-indigo-500" /> Similar board numbers</h2>
               <div className="grid grid-cols-2 gap-2">
                 {related.map((b) => <CommunityBoardTile key={b.id} b={b} to={`${base}/board/${encodeURIComponent(b.number)}`} />)}
               </div>
@@ -521,7 +521,7 @@ function BoardResultPage({ display, base, currentUser, onOpenAuth }: { display: 
 function InfoCard({ info, loading, error }: { info: BoardInfo | null; loading: boolean; error: string | null }) {
   return (
     <section className={`${card} p-5 h-full`}>
-      <h2 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2 mb-3"><Sparkles className="w-4 h-4 text-violet-500" /> Board info <span className="text-[10px] font-semibold text-slate-400">with sources</span></h2>
+      <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-3"><Sparkles className="w-4 h-4 text-violet-500" /> Board info <span className="text-[10px] font-semibold text-slate-400">with sources</span></h2>
       {loading ? (
         <div className="space-y-2">
           <p className="text-xs text-slate-500 flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Searching the web for this board…</p>
@@ -600,7 +600,7 @@ function PcbNumberGuide() {
   ];
   return (
     <section className={`${card} p-5`}>
-      <h2 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2 mb-3"><Tag className="w-4 h-4 text-amber-500" /> Where to find the board number</h2>
+      <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-3"><Tag className="w-4 h-4 text-amber-500" /> Where to find the board number</h2>
       <div className="divide-y divide-slate-100 dark:divide-slate-800">
         {rows.map(([who, where, ex]) => (
           <div key={who} className="py-2 grid grid-cols-1 sm:grid-cols-[160px,1fr,auto] gap-1 sm:gap-3 text-xs items-center">

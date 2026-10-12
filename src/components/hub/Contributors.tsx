@@ -39,17 +39,17 @@ export default function Contributors() {
         <div className={`${card} divide-y divide-slate-100 dark:divide-slate-800`}>
           {people.slice(0, 100).map((c, i) => (
             <div key={c.uid} className={`px-5 py-3 flex items-center gap-4 ${c.uid === uid ? 'bg-emerald-50/60 dark:bg-emerald-950/30' : ''}`}>
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center font-black text-sm shrink-0 ${i === 0 ? 'bg-amber-400 text-white' : i === 1 ? 'bg-slate-300 text-slate-800' : i === 2 ? 'bg-orange-300 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${i === 0 ? 'bg-amber-400 text-white' : i === 1 ? 'bg-slate-300 text-slate-800' : i === 2 ? 'bg-orange-300 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
                 {i < 3 ? <Trophy className="w-4 h-4" /> : i + 1}
               </div>
               <div className="min-w-0 flex-1 space-y-1">
-                <div className="text-sm font-black text-slate-900 dark:text-slate-100">{c.name || 'Community member'}{c.uid === uid ? ' (you)' : ''}</div>
+                <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{c.name || 'Community member'}{c.uid === uid ? ' (you)' : ''}</div>
                 <div className="text-[11px] text-slate-500">
                   {c.guides} guides · {c.teardowns} teardowns · {c.completionsReceived} fixes · {c.answers} answers ({c.accepted} accepted) · {c.videos} videos
                 </div>
                 {c.badges.length > 0 && <div className="flex flex-wrap gap-1">{c.badges.map((b) => <Chip key={b.id} className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"><Award className="w-3 h-3" /><span title={b.description}>{b.label}</span></Chip>)}</div>}
               </div>
-              <div className="text-right shrink-0"><div className="text-lg font-black text-emerald-600">{c.points.toLocaleString()}</div><div className="text-[10px] uppercase font-bold text-slate-500">reputation</div></div>
+              <div className="text-right shrink-0"><div className="text-lg font-bold text-emerald-600">{c.points.toLocaleString()}</div><div className="text-[10px] uppercase font-bold text-slate-500">reputation</div></div>
             </div>
           ))}
         </div>

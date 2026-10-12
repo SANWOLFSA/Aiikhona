@@ -46,7 +46,7 @@ export default function SearchAnalytics() {
 
   return (
     <div className="space-y-8 p-6 bg-white dark:bg-stone-900 rounded-3xl border border-stone-200 dark:border-stone-800">
-      <h2 className="text-xl font-black text-stone-900 dark:text-stone-100 flex items-center gap-2">
+      <h2 className="text-xl font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
         <Search className="w-5 h-5 text-blue-500" />
         Search Analytics
       </h2>

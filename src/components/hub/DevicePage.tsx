@@ -90,8 +90,8 @@ export default function DevicePage({ onOpenAuth }: { onOpenAuth?: () => void }) 
     return (
       <PageShell>
         <div className={`${card} p-6 space-y-3`}>
-          <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-amber-600"><Info className="w-4 h-4" /> Not identified yet</div>
-          <h1 className="text-xl font-black text-slate-900 dark:text-slate-100">“{q}”</h1>
+          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-amber-600"><Info className="w-4 h-4" /> Not identified yet</div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">“{q}”</h1>
           {error && <ErrorNote message={error} />}
           {info?.aiError && <ErrorNote message={info.aiError} />}
           <p className="text-sm text-slate-600 dark:text-slate-300">
@@ -134,14 +134,14 @@ export default function DevicePage({ onOpenAuth }: { onOpenAuth?: () => void }) 
             {info.deviceType && <Chip>{info.deviceType}</Chip>}
             {info.releaseYear && <Chip><Clock className="w-3 h-3" />{info.releaseYear}</Chip>}
           </div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-50 leading-tight">{info.name} repair</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50 leading-tight">{info.name} repair</h1>
           {info.summary && <p className="text-sm text-slate-600 dark:text-slate-300">{info.summary}</p>}
           {info.modelNumbers.length > 0 && <div className="flex flex-wrap gap-1">{info.modelNumbers.map((m) => <Chip key={m}>{m}</Chip>)}</div>}
           <div className="flex flex-wrap items-center gap-2">
             {info.repairability.score !== null ? (
               <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2">
-                <div className={`w-10 h-10 rounded-lg ${scoreColor(info.repairability.score)} text-white font-black flex items-center justify-center`}>{info.repairability.score}</div>
-                <div className="text-[11px] leading-tight"><div className="font-black text-slate-800 dark:text-slate-100 flex items-center gap-1"><Gauge className="w-3 h-3" /> Repairability /10</div><div className="text-slate-500">Published by {info.repairability.source}</div></div>
+                <div className={`w-10 h-10 rounded-lg ${scoreColor(info.repairability.score)} text-white font-bold flex items-center justify-center`}>{info.repairability.score}</div>
+                <div className="text-[11px] leading-tight"><div className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1"><Gauge className="w-3 h-3" /> Repairability /10</div><div className="text-slate-500">Published by {info.repairability.source}</div></div>
               </div>
             ) : (
               <Chip><Gauge className="w-3 h-3" /> No published repairability score found</Chip>
@@ -164,7 +164,7 @@ export default function DevicePage({ onOpenAuth }: { onOpenAuth?: () => void }) 
       <div className="grid lg:grid-cols-2 gap-4">
         {info.specs.length > 0 && (
           <section className={`${card} p-5 space-y-3`}>
-            <h2 className="text-sm font-black flex items-center gap-2 text-slate-900 dark:text-slate-100"><ListChecks className="w-4 h-4 text-indigo-500" /> Specifications</h2>
+            <h2 className="text-sm font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100"><ListChecks className="w-4 h-4 text-indigo-500" /> Specifications</h2>
             <dl className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
               {info.specs.map((s, i) => <div key={i} className="py-1.5 grid grid-cols-3 gap-2"><dt className="text-slate-500 text-xs font-bold">{s.label}</dt><dd className="col-span-2 text-slate-800 dark:text-slate-200">{s.value}</dd></div>)}
             </dl>
@@ -172,25 +172,25 @@ export default function DevicePage({ onOpenAuth }: { onOpenAuth?: () => void }) 
         )}
         {info.commonFaults.length > 0 && (
           <section className={`${card} p-5 space-y-3`}>
-            <h2 className="text-sm font-black flex items-center gap-2 text-slate-900 dark:text-slate-100"><AlertTriangle className="w-4 h-4 text-amber-500" /> Common faults reported</h2>
+            <h2 className="text-sm font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100"><AlertTriangle className="w-4 h-4 text-amber-500" /> Common faults reported</h2>
             <BulletList items={info.commonFaults} />
           </section>
         )}
         {info.identification.length > 0 && (
           <section className={`${card} p-5 space-y-3`}>
-            <h2 className="text-sm font-black flex items-center gap-2 text-slate-900 dark:text-slate-100"><Info className="w-4 h-4 text-indigo-500" /> Identification</h2>
+            <h2 className="text-sm font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100"><Info className="w-4 h-4 text-indigo-500" /> Identification</h2>
             <BulletList items={info.identification} />
           </section>
         )}
         {(info.teardownNotes.length > 0 || info.repairability.notes.length > 0) && (
           <section className={`${card} p-5 space-y-3`}>
-            <h2 className="text-sm font-black flex items-center gap-2 text-slate-900 dark:text-slate-100"><Wrench className="w-4 h-4 text-emerald-500" /> Teardown & repairability notes</h2>
+            <h2 className="text-sm font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100"><Wrench className="w-4 h-4 text-emerald-500" /> Teardown & repairability notes</h2>
             <BulletList items={[...info.teardownNotes, ...info.repairability.notes]} />
           </section>
         )}
         {info.keyParts.length > 0 && (
           <section className={`${card} p-5 space-y-3`}>
-            <h2 className="text-sm font-black flex items-center gap-2 text-slate-900 dark:text-slate-100"><Package className="w-4 h-4 text-emerald-500" /> Replaceable parts</h2>
+            <h2 className="text-sm font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100"><Package className="w-4 h-4 text-emerald-500" /> Replaceable parts</h2>
             <div className="flex flex-wrap gap-1.5">{info.keyParts.map((p) => <Chip key={p}>{p}</Chip>)}</div>
           </section>
         )}

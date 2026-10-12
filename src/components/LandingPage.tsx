@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Cpu, Moon, Sun, Wrench, BookOpen, Leaf } from 'lucide-react';
+import { Moon, Sun, Wrench, BookOpen, Leaf } from 'lucide-react';
 import type { UserProfile } from '../types';
 import AuthPanel from './AuthPanel';
 import { SESSION_EXPIRED_MESSAGE, clearSessionExpiredNotice, peekSessionExpiredNotice } from '../lib/session';
@@ -39,18 +39,15 @@ export default function LandingPage({
       {/* Extremely light overlay to keep the background bright and fully visible */}
       <div className="absolute inset-0 bg-stone-950/20 dark:bg-stone-950/40 transition-colors duration-200 pointer-events-none" />
 
-      {/* Soft Circuit Mint glows */}
-      <div className="absolute -top-24 -right-24 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-emerald-400/10 rounded-full blur-3xl pointer-events-none" />
-
-      <header className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
+      
+      <header className="relative z-10 w-full px-4 sm:px-8 py-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-9 h-9 shrink-0 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-500 flex items-center justify-center shadow-md shadow-indigo-900/30">
-            <Cpu className="w-5 h-5 text-white" />
+          <div className="w-9 h-9 shrink-0 rounded-lg bg-white flex items-center justify-center shadow-md">
+            <Wrench className="w-4.5 h-4.5 text-slate-950" />
           </div>
           <div className="min-w-0">
-            <span className="block text-sm font-extrabold tracking-wide text-white uppercase leading-none drop-shadow">DIY Electronics</span>
-            <span className="block text-[10px] font-semibold text-emerald-300 tracking-widest uppercase mt-1 drop-shadow">Repair bench</span>
+            <span className="block text-[15px] font-semibold tracking-tight text-white leading-none drop-shadow">DIY Electronics</span>
+            <span className="block text-[11px] font-medium text-white/70 mt-1 drop-shadow">Repair bench</span>
           </div>
         </div>
 
@@ -70,8 +67,8 @@ export default function LandingPage({
         <div className="w-full max-w-md">
           <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-white/60 dark:border-slate-800 p-6 sm:p-8 rounded-3xl shadow-2xl shadow-black/30">
             <div className="flex justify-center mb-4">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                <Cpu className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 rounded-xl bg-slate-950 dark:bg-white flex items-center justify-center shadow-md">
+                <Wrench className="w-6 h-6 text-white dark:text-slate-950" />
               </div>
             </div>
             <AuthPanel onLoginSuccess={onLoginSuccess} customBackground={bgImage} notice={expiredNotice} />
@@ -79,15 +76,15 @@ export default function LandingPage({
 
           <ul className="mt-4 grid grid-cols-3 gap-2 text-[11px] sm:text-xs text-white/90">
             <li className="flex flex-col sm:flex-row items-center justify-center gap-1.5 rounded-xl bg-black/30 backdrop-blur-sm px-2 py-2 text-center">
-              <BookOpen className="w-4 h-4 text-emerald-300" />
+              <BookOpen className="w-4 h-4 text-white/80" />
               <span>Repair guides</span>
             </li>
             <li className="flex flex-col sm:flex-row items-center justify-center gap-1.5 rounded-xl bg-black/30 backdrop-blur-sm px-2 py-2 text-center">
-              <Wrench className="w-4 h-4 text-emerald-300" />
+              <Wrench className="w-4 h-4 text-white/80" />
               <span>Diagnostics</span>
             </li>
             <li className="flex flex-col sm:flex-row items-center justify-center gap-1.5 rounded-xl bg-black/30 backdrop-blur-sm px-2 py-2 text-center">
-              <Leaf className="w-4 h-4 text-emerald-300" />
+              <Leaf className="w-4 h-4 text-white/80" />
               <span>Less e-waste</span>
             </li>
           </ul>

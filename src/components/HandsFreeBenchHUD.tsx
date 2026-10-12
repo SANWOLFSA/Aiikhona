@@ -53,7 +53,7 @@ export const HandsFreeBenchHUD: React.FC<HandsFreeBenchHUDProps> = ({
             className={`relative flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 ${
               isListening
                 ? 'bg-rose-500 text-white shadow-rose-500/30 ring-2 ring-rose-400/50'
-                : 'bg-amber-400 hover:bg-amber-300 text-stone-950 dark:bg-amber-400 dark:hover:bg-amber-300'
+                : 'bg-cobalt-600 hover:bg-cobalt-500 text-white dark:bg-amber-400 dark:hover:bg-amber-300'
             }`}
             title={isListening ? "Pause Voice Listening" : "Start Hands-Free Voice Control"}
           >
@@ -171,7 +171,7 @@ export const HandsFreeBenchHUD: React.FC<HandsFreeBenchHUDProps> = ({
           </div>
 
           {matchedCommand && (
-            <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] font-black shrink-0 border border-emerald-300 dark:border-emerald-800 animate-bounce">
+            <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] font-bold shrink-0 border border-emerald-300 dark:border-emerald-800 animate-bounce">
               <Sparkles className="w-3 h-3 text-emerald-600" />
               <span>Executed: {matchedCommand}</span>
             </div>
@@ -195,7 +195,7 @@ export const HandsFreeBenchHUD: React.FC<HandsFreeBenchHUDProps> = ({
                 key={idx}
                 type="button"
                 onClick={() => onSimulateCommand?.(cmd.phrase.split('/')[0].trim())}
-                className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 hover:border-amber-400 dark:hover:border-amber-500 flex flex-col justify-between text-left transition-all hover:shadow-xs active:scale-[0.99] group cursor-pointer"
+                className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 hover:border-cobalt-400 dark:hover:border-cobalt-400 flex flex-col justify-between text-left transition-all hover:shadow-xs active:scale-[0.99] group cursor-pointer"
               >
                 <div className="flex items-center justify-between w-full">
                   <span className="font-mono font-bold text-blue-600 dark:text-blue-400 group-hover:text-amber-600 dark:group-hover:text-amber-400 text-[11px]">
@@ -219,11 +219,11 @@ export const HandsFreeBenchHUD: React.FC<HandsFreeBenchHUDProps> = ({
               value={manualInput}
               onChange={(e) => setManualInput(e.target.value)}
               placeholder="Test voice phrase (e.g. next step, pass, run diagnosis, read step)..."
-              className="flex-1 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+              className="flex-1 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-cobalt-500"
             />
             <button
               type="submit"
-              className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold text-xs flex items-center gap-1 transition-all"
+              className="px-3 py-1.5 rounded-lg bg-cobalt-600 hover:bg-cobalt-500 text-white font-bold text-xs flex items-center gap-1 transition-all"
             >
               <Send className="w-3 h-3" />
               <span>Test</span>

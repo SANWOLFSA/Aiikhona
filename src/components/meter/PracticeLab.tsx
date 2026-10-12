@@ -67,7 +67,7 @@ export default function PracticeLab({ componentId }: { componentId?: string }) {
         <div className="flex flex-col items-center gap-2">
           <MeterFace mode={mode} red={red} black={black} digits={outcome.display} unit="" danger={outcome.level === 'danger'} beep={/BEEP/.test(outcome.display)}
             onMode={setMode} onJack={(j) => (placing === 'red' ? setRed(j) : setBlack(j))} placing={placing} />
-          {outcome.display && <p className="font-mono text-sm font-black text-slate-900 dark:text-white text-center">Display: {outcome.display}</p>}
+          {outcome.display && <p className="font-mono text-sm font-bold text-slate-900 dark:text-white text-center">Display: {outcome.display}</p>}
           <div className="flex gap-2 text-xs">
             {(['red', 'black'] as const).map((p) => (
               <button key={p} onClick={() => setPlacing(p)} className={`px-3 py-1.5 rounded-lg font-bold border ${placing === p ? (p === 'red' ? 'bg-red-600 text-white border-red-600' : 'bg-slate-900 text-white border-slate-900 dark:bg-slate-200 dark:text-slate-900') : 'border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}>place {p}</button>
@@ -77,7 +77,7 @@ export default function PracticeLab({ componentId }: { componentId?: string }) {
 
         <div className="space-y-4 min-w-0">
           <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/80 p-4 space-y-2">
-            <h3 className="text-sm font-black text-slate-900 dark:text-white">1 · Set the dial and jacks, then pick where the probes touch</h3>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">1 · Set the dial and jacks, then pick where the probes touch</h3>
             <div className="space-y-1.5">
               {spec.tests.map((t) => (
                 <label key={t.id} className={`flex items-start gap-2 rounded-xl border p-2.5 cursor-pointer text-xs ${t.id === testId ? 'border-emerald-400 bg-emerald-50/70 dark:bg-emerald-950/30' : 'border-slate-200 dark:border-slate-700'}`}>
@@ -103,13 +103,13 @@ export default function PracticeLab({ componentId }: { componentId?: string }) {
           </section>
 
           <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/80 p-4 space-y-3">
-            <h3 className="text-sm font-black text-slate-900 dark:text-white">2 · Is it good?</h3>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">2 · Is it good?</h3>
             <div className="flex flex-wrap gap-2">
               {spec.faults.map((f) => {
                 const isRight = answer && f === fault, isPicked = answer === f;
                 return (
                   <button key={f} onClick={() => choose(f)} disabled={!!answer}
-                    className={`px-4 py-2 rounded-xl text-xs font-black border capitalize transition ${isRight ? 'bg-emerald-500 text-white border-emerald-500' : isPicked ? 'bg-red-500 text-white border-red-500' : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
+                    className={`px-4 py-2 rounded-xl text-xs font-bold border capitalize transition ${isRight ? 'bg-emerald-500 text-white border-emerald-500' : isPicked ? 'bg-red-500 text-white border-red-500' : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
                     {faultLabel(spec, f)}
                   </button>
                 );

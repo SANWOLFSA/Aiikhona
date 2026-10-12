@@ -87,7 +87,7 @@ function Empty({ icon: Icon, title, body }: { icon: any; title: string; body: st
   return (
     <div className={`${cardCls} py-12 px-6 text-center space-y-2`}>
       <Icon className="w-9 h-9 mx-auto text-emerald-500" />
-      <p className="text-sm font-black text-slate-900 dark:text-slate-100">{title}</p>
+      <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{title}</p>
       <p className="text-xs text-slate-500 max-w-md mx-auto">{body}</p>
     </div>
   );
@@ -119,14 +119,14 @@ export default function AdminDesk({ themeConfig }: { themeConfig?: ThemeConfig }
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+    <div className="ds-page space-y-6">
       <div className={`${cardCls} p-6 sm:p-8 flex flex-col lg:flex-row lg:items-end justify-between gap-6`}>
         <div className="space-y-2 max-w-2xl">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-400/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-400/30 text-xs font-bold">
             <ShieldCheck className="w-3.5 h-3.5" />
             <span>Admin Desk{admin.email ? ` · ${admin.email}` : ''}</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-50 tracking-tight">{titles[tab][0]}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">{titles[tab][0]}</h1>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">{titles[tab][1]}</p>
         </div>
         <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800/80 rounded-2xl p-1 gap-0.5">
@@ -148,7 +148,7 @@ export default function AdminDesk({ themeConfig }: { themeConfig?: ThemeConfig }
 
       {admin.bootstrapOnly && (
         <div className="p-5 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-900/50 text-xs text-amber-900 dark:text-amber-200 space-y-2">
-          <p className="font-black flex items-center gap-2 text-sm"><AlertTriangle className="w-4 h-4 text-amber-500" /> Finish admin setup: your actions will be rejected until you do</p>
+          <p className="font-bold flex items-center gap-2 text-sm"><AlertTriangle className="w-4 h-4 text-amber-500" /> Finish admin setup: your actions will be rejected until you do</p>
           <p>You can see this desk because your email is listed in <code className="font-mono">VITE_ADMIN_EMAILS</code>, but the security rules don't recognise you as an admin yet. Do one of these in the Firebase console:</p>
           <ol className="list-decimal pl-5 space-y-1">
             <li>Firestore: create a document <code className="font-mono">admins/{admin.uid}</code> (any fields, e.g. <code className="font-mono">email: "{admin.email}"</code>), <b>or</b> set <code className="font-mono">role: "admin"</code> on <code className="font-mono">users/{admin.uid}</code>.</li>
@@ -310,14 +310,14 @@ function VerificationCard({ app, actor, expanded, onToggle }: { app: SellerVerif
     <div className={`${cardCls} overflow-hidden`}>
       <button onClick={onToggle} className="w-full text-left bg-slate-50/80 dark:bg-slate-800/40 px-5 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800">
         <div className="min-w-0">
-          <h4 className="text-base font-black text-slate-900 dark:text-slate-100 truncate">{app.companyName || 'Unnamed company'}</h4>
+          <h4 className="text-base font-bold text-slate-900 dark:text-slate-100 truncate">{app.companyName || 'Unnamed company'}</h4>
           <p className="text-[11px] text-slate-500 font-mono">
             {app.registrationNumber || 'no reg. no.'} · submitted {formatTs(app.submittedAt)} · #{app.submissionCount || 0}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-slate-500">{docs.length}/{VERIFICATION_DOC_TYPES.length} docs</span>
-          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${STATUS_STYLE[app.status]}`}>{STATUS_LABELS[app.status]}</span>
+          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${STATUS_STYLE[app.status]}`}>{STATUS_LABELS[app.status]}</span>
         </div>
       </button>
 
@@ -346,7 +346,7 @@ function VerificationCard({ app, actor, expanded, onToggle }: { app: SellerVerif
           )}
 
           <div className="space-y-2">
-            <h5 className="text-[11px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5"><ClipboardList className="w-3.5 h-3.5" /> Document checklist</h5>
+            <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5"><ClipboardList className="w-3.5 h-3.5" /> Document checklist</h5>
             <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
               <table className="w-full text-xs">
                 <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500">
@@ -428,7 +428,7 @@ function VerificationCard({ app, actor, expanded, onToggle }: { app: SellerVerif
                 <button
                   disabled={busy || !requiredChecked}
                   onClick={() => act('approved')}
-                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs transition-colors inline-flex items-center gap-1.5 disabled:opacity-50"
+                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs transition-colors inline-flex items-center gap-1.5 disabled:opacity-50"
                 >
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <BadgeCheck className="w-4 h-4" />} Approve & verify
                 </button>
@@ -444,7 +444,7 @@ function VerificationCard({ app, actor, expanded, onToggle }: { app: SellerVerif
             )}
             {mode && (
               <>
-                <button disabled={busy} onClick={() => act(mode === 'reject' ? 'rejected' : 'revoked')} className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white font-black text-xs inline-flex items-center gap-1.5 disabled:opacity-50">
+                <button disabled={busy} onClick={() => act(mode === 'reject' ? 'rejected' : 'revoked')} className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold text-xs inline-flex items-center gap-1.5 disabled:opacity-50">
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />} Confirm {mode === 'reject' ? 'rejection' : 'revocation'}
                 </button>
                 <button disabled={busy} onClick={() => { setMode(null); setReason(''); }} className={ghostBtn}>Cancel</button>
@@ -542,7 +542,7 @@ function ModerationRow({ listing, actor }: { listing: ListingDoc; actor: Actor |
       <div className="flex-1 min-w-0 space-y-1">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-bold text-slate-900 dark:text-slate-100 line-clamp-1">{listing.title}</p>
-          <span className="text-xs font-mono font-black text-slate-700 dark:text-slate-200 shrink-0">{formatZar(listing.price)}</span>
+          <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-200 shrink-0">{formatZar(listing.price)}</span>
         </div>
         <p className="text-[11px] text-slate-500">
           {listing.sellerName} ({listing.sellerType}) · {listing.category} · {listing.condition} · {formatTs(listing.createdAt)}
@@ -554,7 +554,7 @@ function ModerationRow({ listing, actor }: { listing: ListingDoc; actor: Actor |
         )}
         <div className="flex flex-wrap gap-1.5 pt-1">
           {listing.status !== 'active' && !removing && (
-            <button disabled={busy} onClick={() => run(a => adminModerateListing(listing, 'active', a))} className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black inline-flex items-center gap-1 disabled:opacity-50">
+            <button disabled={busy} onClick={() => run(a => adminModerateListing(listing, 'active', a))} className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold inline-flex items-center gap-1 disabled:opacity-50">
               <CheckCircle2 className="w-3.5 h-3.5" /> Approve
             </button>
           )}
@@ -565,7 +565,7 @@ function ModerationRow({ listing, actor }: { listing: ListingDoc; actor: Actor |
           )}
           {removing && (
             <>
-              <button disabled={busy || !reason.trim()} onClick={() => run(a => adminModerateListing(listing, 'removed', a, reason))} className="px-3 py-1.5 rounded-xl bg-red-500 text-white text-xs font-black disabled:opacity-50">Confirm remove</button>
+              <button disabled={busy || !reason.trim()} onClick={() => run(a => adminModerateListing(listing, 'removed', a, reason))} className="px-3 py-1.5 rounded-xl bg-red-500 text-white text-xs font-bold disabled:opacity-50">Confirm remove</button>
               <button disabled={busy} onClick={() => setRemoving(false)} className={`${ghostBtn} !py-1.5`}>Cancel</button>
             </>
           )}

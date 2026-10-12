@@ -87,7 +87,7 @@ export default function UploadBoardDialog({ initialNumber, uid, ownerName, defau
       <form onSubmit={submit} className="w-full sm:max-w-lg max-h-[92vh] overflow-y-auto bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xl">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2"><Camera className="w-5 h-5 text-indigo-500" /> Upload a real board photo</h2>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2"><Camera className="w-5 h-5 text-indigo-500" /> Upload a real board photo</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Your own photos only. Make sure the board number is readable.</p>
           </div>
           <button type="button" aria-label="Close" onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500"><X className="w-5 h-5" /></button>

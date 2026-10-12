@@ -76,7 +76,7 @@ function ComponentsHome() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
         {COMPONENT_TYPES.map((t) => (
           <RouteLink key={t.key} to={multimeterTestPath(t.key)} className={`${card} p-3 hover:border-emerald-500 transition-colors`}>
-            <div className="text-sm font-black text-slate-900 dark:text-slate-100">{t.label}</div>
+            <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{t.label}</div>
             <div className="text-[11px] text-slate-500">{t.examples}</div>
           </RouteLink>
         ))}
@@ -91,7 +91,7 @@ function ComponentsHome() {
             <RouteLink key={p.id} to={`/components/${encodeURIComponent(p.id)}`} className={`${card} p-3 flex items-center gap-3 hover:border-indigo-500 transition-colors`}>
               <div className="w-10 h-10 rounded-lg bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center shrink-0"><Cpu className="w-5 h-5 text-indigo-500" /></div>
               <div className="min-w-0">
-                <div className="text-sm font-black text-slate-900 dark:text-slate-100 truncate">{p.partNumber}</div>
+                <div className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{p.partNumber}</div>
                 <div className="text-[11px] text-slate-500 truncate">{[p.manufacturer, p.category, p.package].filter(Boolean).join(' · ')}</div>
               </div>
             </RouteLink>
@@ -168,7 +168,7 @@ function ComponentPage({ rawId, onOpenAuth }: { rawId: string; onOpenAuth?: () =
           {info?.package && <Chip>{info.package}</Chip>}
           {info?.manufacturer && <Chip>{info.manufacturer}</Chip>}
         </div>
-        <h1 className="text-2xl font-black text-slate-900 dark:text-slate-50">{info?.found ? info.partNumber : q}</h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">{info?.found ? info.partNumber : q}</h1>
         {info?.found && info.description && <p className="text-sm text-slate-600 dark:text-slate-300">{info.description}</p>}
         {error && <ErrorNote message={error} />}
         {info?.aiError && <ErrorNote message={`${info.aiError} The datasheet and distributor links below still work.`} />}
@@ -195,15 +195,15 @@ function ComponentPage({ rawId, onOpenAuth }: { rawId: string; onOpenAuth?: () =
 
       <div className="grid lg:grid-cols-2 gap-4">
         <section className={`${card} p-5 space-y-3`}>
-          <h2 className="text-sm font-black flex items-center gap-2 text-slate-900 dark:text-slate-100"><FileText className="w-4 h-4 text-indigo-500" /> Datasheets</h2>
+          <h2 className="text-sm font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100"><FileText className="w-4 h-4 text-indigo-500" /> Datasheets</h2>
           <div className="flex flex-wrap gap-1.5">{datasheetLinks.map((l) => <ExtLink key={l.url} href={l.url}>{l.label}</ExtLink>)}</div>
-          <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-500 pt-2">Buy & compare</h3>
+          <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 pt-2">Buy & compare</h3>
           <div className="flex flex-wrap gap-1.5">{otherLinks.map((l) => <ExtLink key={l.url} href={l.url}>{l.label}</ExtLink>)}</div>
           <p className="text-[11px] text-slate-500">These open searches; availability is not checked by us.</p>
         </section>
         {info?.found && info.specs.length > 0 && (
           <section className={`${card} p-5 space-y-3`}>
-            <h2 className="text-sm font-black flex items-center gap-2 text-slate-900 dark:text-slate-100"><ListChecks className="w-4 h-4 text-indigo-500" /> Key specifications</h2>
+            <h2 className="text-sm font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100"><ListChecks className="w-4 h-4 text-indigo-500" /> Key specifications</h2>
             <dl className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
               {info.specs.map((s, i) => <div key={i} className="py-1.5 grid grid-cols-3 gap-2"><dt className="text-slate-500 text-xs font-bold">{s.label}</dt><dd className="col-span-2 text-slate-800 dark:text-slate-200">{s.value}</dd></div>)}
             </dl>
@@ -211,11 +211,11 @@ function ComponentPage({ rawId, onOpenAuth }: { rawId: string; onOpenAuth?: () =
         )}
         {info?.found && info.pinout.length > 0 && (
           <section className={`${card} p-5 space-y-3 overflow-x-auto`}>
-            <h2 className="text-sm font-black flex items-center gap-2 text-slate-900 dark:text-slate-100"><Cpu className="w-4 h-4 text-emerald-500" /> Pinout</h2>
+            <h2 className="text-sm font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100"><Cpu className="w-4 h-4 text-emerald-500" /> Pinout</h2>
             <table className="w-full text-xs">
               <thead><tr className="text-left text-slate-500"><th className="py-1 pr-2">Pin</th><th className="py-1 pr-2">Name</th><th className="py-1">Function</th></tr></thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {info.pinout.map((p, i) => <tr key={i}><td className="py-1 pr-2 font-black">{p.pin}</td><td className="py-1 pr-2 font-bold text-indigo-600 dark:text-indigo-400">{p.name}</td><td className="py-1 text-slate-600 dark:text-slate-300">{p.function}</td></tr>)}
+                {info.pinout.map((p, i) => <tr key={i}><td className="py-1 pr-2 font-bold">{p.pin}</td><td className="py-1 pr-2 font-bold text-indigo-600 dark:text-indigo-400">{p.name}</td><td className="py-1 text-slate-600 dark:text-slate-300">{p.function}</td></tr>)}
               </tbody>
             </table>
             <p className="text-[11px] text-slate-500">Confirm against the datasheet for your exact package before soldering.</p>
@@ -223,7 +223,7 @@ function ComponentPage({ rawId, onOpenAuth }: { rawId: string; onOpenAuth?: () =
         )}
         {info?.found && info.equivalents.length > 0 && (
           <section className={`${card} p-5 space-y-3`}>
-            <h2 className="text-sm font-black flex items-center gap-2 text-slate-900 dark:text-slate-100"><Repeat className="w-4 h-4 text-amber-500" /> Equivalents / substitutes</h2>
+            <h2 className="text-sm font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100"><Repeat className="w-4 h-4 text-amber-500" /> Equivalents / substitutes</h2>
             <div className="flex flex-wrap gap-1.5">
               {info.equivalents.map((e) => {
                 const pn = normalizePartNumber(e.split(/[\s(]/)[0] || e);
@@ -235,13 +235,13 @@ function ComponentPage({ rawId, onOpenAuth }: { rawId: string; onOpenAuth?: () =
         )}
         {info?.found && (info.applications.length > 0 || info.markings.length > 0) && (
           <section className={`${card} p-5 space-y-3`}>
-            {info.applications.length > 0 && <><h2 className="text-sm font-black text-slate-900 dark:text-slate-100">Typical applications</h2><BulletList items={info.applications} /></>}
-            {info.markings.length > 0 && <><h3 className="text-[11px] font-black uppercase tracking-wider text-slate-500 pt-2">Marking codes</h3><div className="flex flex-wrap gap-1">{info.markings.map((m) => <Chip key={m}>{m}</Chip>)}</div></>}
+            {info.applications.length > 0 && <><h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">Typical applications</h2><BulletList items={info.applications} /></>}
+            {info.markings.length > 0 && <><h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 pt-2">Marking codes</h3><div className="flex flex-wrap gap-1">{info.markings.map((m) => <Chip key={m}>{m}</Chip>)}</div></>}
           </section>
         )}
         {info?.found && info.testNotes.length > 0 && (
           <section className={`${card} p-5 space-y-3`}>
-            <h2 className="text-sm font-black flex items-center gap-2 text-slate-900 dark:text-slate-100"><Gauge className="w-4 h-4 text-emerald-500" /> Testing notes</h2>
+            <h2 className="text-sm font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100"><Gauge className="w-4 h-4 text-emerald-500" /> Testing notes</h2>
             <BulletList items={info.testNotes} />
           </section>
         )}

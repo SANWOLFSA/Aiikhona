@@ -181,15 +181,15 @@ export default function FileStorageManager({ currentUser }: { currentUser: any }
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
+    <div className="ds-page space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between pb-6 border-b border-stone-200 dark:border-stone-800">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-amber-400 text-stone-950 flex items-center justify-center font-black shadow-lg">
+          <div className="w-12 h-12 rounded-2xl bg-cobalt-600 text-white flex items-center justify-center font-bold shadow-lg">
             <Folder className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-xl font-black text-stone-900 dark:text-stone-100">Cloud File Storage</h1>
+            <h1 className="text-xl font-bold text-stone-900 dark:text-stone-100">Cloud File Storage</h1>
             <p className="text-xs text-stone-500 dark:text-stone-400">Securely upload, view, download, and delete your personal repair schematics, boardviews, and documents</p>
           </div>
         </div>
@@ -221,7 +221,7 @@ export default function FileStorageManager({ currentUser }: { currentUser: any }
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2">
           <div className="flex items-center gap-2">
             <Upload className="w-5 h-5 text-amber-500" />
-            <h3 className="text-sm font-black text-stone-900 dark:text-stone-100">Upload New Engineering Asset</h3>
+            <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100">Upload New Engineering Asset</h3>
           </div>
           <span className="text-[11px] font-bold text-stone-400">
             Storage Engine: Firebase Cloud Storage (25MB Max)
@@ -248,7 +248,7 @@ export default function FileStorageManager({ currentUser }: { currentUser: any }
                   ? fileValidationStatus.isValid
                     ? 'border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/20'
                     : 'border-rose-500 bg-rose-50/20 dark:bg-rose-950/20'
-                  : 'border-stone-300 dark:border-stone-700 hover:border-amber-400 bg-stone-50 dark:bg-stone-950/40'
+                  : 'border-stone-300 dark:border-stone-700 hover:border-cobalt-400 bg-stone-50 dark:bg-stone-950/40'
             }`}
           >
             <input 
@@ -330,9 +330,9 @@ export default function FileStorageManager({ currentUser }: { currentUser: any }
             <button
               type="submit"
               disabled={isUploading || !selectedFile || !fileValidationStatus?.isValid}
-              className={`px-6 py-3 rounded-xl text-xs font-black flex items-center gap-2 shadow-md transition-all cursor-pointer ${
+              className={`px-6 py-3 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition-all cursor-pointer ${
                 fileValidationStatus?.isValid
-                  ? 'bg-amber-400 hover:bg-amber-500 text-stone-950 active:scale-95'
+                  ? 'bg-cobalt-600 hover:bg-cobalt-500 text-white active:scale-95'
                   : 'bg-stone-200 dark:bg-stone-800 text-stone-400 dark:text-stone-600 cursor-not-allowed opacity-60'
               }`}
             >
@@ -345,7 +345,7 @@ export default function FileStorageManager({ currentUser }: { currentUser: any }
 
       {/* Files List */}
       <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 shadow-sm space-y-4">
-        <h3 className="text-sm font-black text-stone-900 dark:text-stone-100 flex items-center gap-2">
+        <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
           <Folder className="w-4 h-4 text-amber-500" />
           <span>Your Stored Files ({files.length})</span>
         </h3>
@@ -432,7 +432,7 @@ export default function FileStorageManager({ currentUser }: { currentUser: any }
                     href={previewUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-amber-400 text-stone-950 px-5 py-2.5 rounded-xl text-xs font-bold shadow-md"
+                    className="inline-flex items-center gap-2 bg-cobalt-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md"
                   >
                     <Download className="w-4 h-4" />
                     <span>Open in New Tab</span>

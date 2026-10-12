@@ -7,6 +7,41 @@ import { useCommunity, compressImage, type CommunityPost } from '../lib/communit
 import { useMarketplaceListings, requestListingFocus, type ListingItem } from '../lib/marketplaceListings';
 import MarketplaceStories from './home/MarketplaceStories';
 import CommunityPostCard from './home/CommunityPostCard';
+import { RouteLink } from '../hooks/usePathname';
+import { Search as SearchIcon, Smartphone, GraduationCap, ShoppingBag, Activity, Gauge, ArrowRight } from 'lucide-react';
+
+const QUICK_LINKS = [
+  { to: '/search', label: 'Search everything', sub: 'Devices, part numbers, guides, answers', icon: SearchIcon },
+  { to: '/devices', label: 'Find your device', sub: 'Guides and fixes by brand and model', icon: Smartphone },
+  { to: '/diagnostic', label: 'AI diagnostic', sub: 'Describe the fault, get a test plan', icon: Activity },
+  { to: '/marketplace', label: 'Marketplace', sub: 'Parts and tools from local sellers', icon: ShoppingBag },
+  { to: '/theory', label: 'Theory & courses', sub: 'School, TVET N1–N6, university', icon: GraduationCap },
+  { to: '/multimeter', label: 'Multimeter lab', sub: 'Practise testing components', icon: Gauge },
+];
+
+/** Right-hand rail on wide screens: quick ways into the rest of the app. */
+function HomeRail() {
+  return (
+    <aside className="hidden xl:block sticky top-[4.75rem] space-y-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-2 shadow-xs">
+        <div className="px-3 pt-2 pb-1 text-[11px] font-medium text-slate-400">Jump in</div>
+        {QUICK_LINKS.map(l => {
+          const Icon = l.icon;
+          return (
+            <RouteLink key={l.to} to={l.to} className="group flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+              <span className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center shrink-0 group-hover:text-cobalt-600 dark:group-hover:text-cobalt-400"><Icon className="w-4 h-4" /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-slate-900 dark:text-white">{l.label}</span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400 truncate">{l.sub}</span>
+              </span>
+              <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors" />
+            </RouteLink>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
 
 const CATEGORIES = ['Smartphones', 'Laptops & PCs', 'Gaming Consoles', 'TVs & Monitors', 'Audio & Headphones', 'Tablets', 'Home Appliances', 'Other'];
 const BRANDS = ['Apple', 'Samsung', 'Xiaomi', 'Huawei', 'Google', 'Sony', 'Nintendo', 'Microsoft', 'LG', 'Dell', 'HP', 'Lenovo', 'Asus', 'Acer', 'JBL', 'Bose', 'Hisense', 'Defy'];
@@ -89,7 +124,12 @@ export default function HomeFeed({
   const firstName = currentUser.name?.split(' ')[0] || 'there';
 
   return (
-    <div className="max-w-2xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-5">
+    <div className="ds-page grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start">
+    <div className="space-y-5 min-w-0">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">Community</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Ask for help with a repair, share a fix, and see what is new in the marketplace.</p>
+      </div>
       {/* Marketplace Stories */}
       <MarketplaceStories listings={listings} onViewItem={handleViewItem} onOpenMarketplace={onSelectMarketplace ? () => onSelectMarketplace('') : undefined} />
 
@@ -136,7 +176,7 @@ export default function HomeFeed({
               onClick={() => setFilter(id)}
               className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
                 filter === id
-                  ? 'bg-gradient-to-r from-indigo-600 to-violet-500 text-white shadow-sm shadow-indigo-500/25'
+                  ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
                   : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-300'
               }`}
             >
@@ -167,6 +207,9 @@ export default function HomeFeed({
           </div>
         )}
       </div>
+    </div>
+
+      <HomeRail />
 
       <AnimatePresence>
         {isCreateOpen && (
@@ -281,7 +324,7 @@ function CreatePostModal({
         className="w-full sm:max-w-lg max-h-[92vh] overflow-y-auto bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 space-y-4 shadow-2xl"
       >
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+          <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-emerald-500" /> Ask the community
           </h3>
           <button type="button" onClick={onClose} aria-label="Close" className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
@@ -362,7 +405,7 @@ function CreatePostModal({
           <button
             type="submit"
             disabled={submitting || processing || !title.trim() || !content.trim()}
-            className={`px-5 py-2.5 rounded-xl ${themeConfig?.primaryBg || 'bg-indigo-600'} ${themeConfig?.primaryText || 'text-white'} text-sm font-black shadow-md shadow-indigo-500/20 disabled:opacity-50 flex items-center gap-2`}
+            className={`px-5 py-2.5 rounded-xl ${themeConfig?.primaryBg || 'bg-indigo-600'} ${themeConfig?.primaryText || 'text-white'} text-sm font-bold shadow-md shadow-indigo-500/20 disabled:opacity-50 flex items-center gap-2`}
           >
             {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
             Post

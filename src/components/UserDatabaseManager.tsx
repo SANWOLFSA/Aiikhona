@@ -215,15 +215,15 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+    <div className="ds-page space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-stone-200 dark:border-stone-800">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-amber-400 text-stone-950 flex items-center justify-center font-black shadow-lg">
+          <div className="w-12 h-12 rounded-2xl bg-cobalt-600 text-white flex items-center justify-center font-bold shadow-lg">
             <Database className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-xl font-black text-stone-900 dark:text-stone-100">User Data & Storage</h1>
+            <h1 className="text-xl font-bold text-stone-900 dark:text-stone-100">User Data & Storage</h1>
             <p className="text-xs text-stone-500 dark:text-stone-400">Manage your saved devices and uploaded diagnostic metadata</p>
           </div>
         </div>
@@ -269,7 +269,7 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
       {activeTab === 'devices' ? (
         <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-black text-stone-900 dark:text-stone-100 flex items-center gap-2">
+            <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
               <Tv className="w-4 h-4 text-amber-500" />
               <span>Saved Devices ({savedDevices.length})</span>
             </h3>
@@ -300,10 +300,10 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
                           {device.brandName}
                         </span>
                         {isTv && device.screenSizeInches && (
-                          <span className="text-xs font-black text-stone-900 dark:text-stone-100">{device.screenSizeInches}</span>
+                          <span className="text-xs font-bold text-stone-900 dark:text-stone-100">{device.screenSizeInches}</span>
                         )}
                       </div>
-                      <h4 className="text-sm font-black text-stone-900 dark:text-stone-100 flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
                         {isTv ? <Tv className="w-4 h-4 text-stone-400" /> : <Cpu className="w-4 h-4 text-stone-400" />}
                         {device.sizeName}
                       </h4>
@@ -335,7 +335,7 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-stone-100 dark:border-stone-800/80">
               <div className="flex items-center gap-2">
                 <Upload className="w-5 h-5 text-amber-500" />
-                <h3 className="text-sm font-black text-stone-900 dark:text-stone-100">Log New Metadata & Upload Date</h3>
+                <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100">Log New Metadata & Upload Date</h3>
               </div>
               <div className="flex items-center gap-2">
                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-colors ${
@@ -394,7 +394,7 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
                           ? validationRules.isFileNameValid
                             ? 'bg-emerald-50/20 dark:bg-emerald-950/20 border-emerald-500 text-stone-900 dark:text-stone-100 focus:ring-2 focus:ring-emerald-400'
                             : 'bg-rose-50/20 dark:bg-rose-950/20 border-rose-500 text-stone-900 dark:text-stone-100 focus:ring-2 focus:ring-rose-400'
-                          : 'bg-stone-50 dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400'
+                          : 'bg-stone-50 dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-cobalt-500'
                       }`}
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -456,7 +456,7 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
                   <select 
                     value={fileType}
                     onChange={e => setFileType(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl text-xs bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    className="w-full px-4 py-3 rounded-xl text-xs bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-cobalt-500"
                   >
                     <option value="PDF Schematic">PDF Schematic (Circuit Maps)</option>
                     <option value="Boardview / CAD">Boardview / CAD (.brd / .cad)</option>
@@ -491,7 +491,7 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
                     }}
                     onBlur={() => setNotesTouched(true)}
                     placeholder="e.g., Uploaded by Master Technician for regional motherboard repair logging"
-                    className="w-full px-4 py-3 rounded-xl text-xs bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    className="w-full px-4 py-3 rounded-xl text-xs bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-cobalt-500"
                   />
                 </div>
               </div>
@@ -597,9 +597,9 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
                 <button
                   type="submit"
                   disabled={isSubmitting || !validationRules.isFormValid}
-                  className={`px-6 py-3 rounded-xl text-xs font-black flex items-center gap-2 shadow-md transition-all cursor-pointer ${
+                  className={`px-6 py-3 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition-all cursor-pointer ${
                     validationRules.isFormValid
-                      ? 'bg-amber-400 hover:bg-amber-500 text-stone-950 active:scale-95'
+                      ? 'bg-cobalt-600 hover:bg-cobalt-500 text-white active:scale-95'
                       : 'bg-stone-200 dark:bg-stone-800 text-stone-400 dark:text-stone-600 cursor-not-allowed opacity-60'
                   }`}
                 >
@@ -613,7 +613,7 @@ export default function UserDatabaseManager({ currentUser }: { currentUser: any 
           {/* Database Records Table */}
           <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-black text-stone-900 dark:text-stone-100 flex items-center gap-2">
+              <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-amber-500" />
                 <span>Stored Database Records ({records.length})</span>
               </h3>

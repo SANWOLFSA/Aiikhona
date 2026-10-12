@@ -34,7 +34,7 @@ const PERSONAS = [
     name: 'SANWOLF',
     role: 'Expert electronic diagnostics, component troubleshooting & repair copilot',
     icon: Bot,
-    color: 'bg-amber-400 text-stone-950',
+    color: 'bg-cobalt-600 text-white',
     iconColor: 'text-amber-500 fill-amber-500',
     greeting: 'Hello! I am SANWOLF, your AI Repair Copilot. Ask me anything about troubleshooting motherboards, soldering, component replacement, smartphone repair, or circuit diagnostics.'
   },
@@ -186,7 +186,7 @@ export default function AiAssistantView() {
   const ActiveIcon = activePersona.icon;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 flex flex-col h-[calc(100vh-6rem)]">
+    <div className="ds-page flex flex-col h-[calc(100dvh-3.5rem)]">
       {/* Persona Selector */}
       <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-2 no-scrollbar">
         {PERSONAS.map(p => {
@@ -214,11 +214,11 @@ export default function AiAssistantView() {
       {/* Header */}
       <div className="flex items-center justify-between pb-6 border-b border-stone-200 dark:border-stone-800">
         <div className="flex items-center gap-3">
-          <div className={`w-12 h-12 rounded-2xl ${activePersona.color} flex items-center justify-center font-black shadow-lg`}>
+          <div className={`w-12 h-12 rounded-2xl ${activePersona.color} flex items-center justify-center font-bold shadow-lg`}>
             <ActiveIcon className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-xl font-black text-stone-900 dark:text-stone-100 flex items-center gap-2">
+            <h1 className="text-xl font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
               {activePersona.name} AI Assistant <Sparkles className={`w-4 h-4 ${activePersona.iconColor}`} />
             </h1>
             <p className="text-xs text-stone-500 dark:text-stone-400">{activePersona.role}</p>
@@ -274,7 +274,7 @@ export default function AiAssistantView() {
                   </button>
                 </div>
               ) : msg.sender === 'assistant' ? (
-                <div className="leading-relaxed break-words [&_h1]:font-black [&_h1]:text-base [&_h2]:font-bold [&_h2]:text-base [&_h2]:mt-3 [&_h3]:font-bold [&_h3]:mt-2 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_code]:font-mono [&_code]:text-xs [&_code]:bg-stone-100 dark:[&_code]:bg-stone-800 [&_code]:px-1 [&_code]:rounded [&_pre]:overflow-x-auto [&_pre]:bg-stone-100 dark:[&_pre]:bg-stone-800 [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:my-2 [&_blockquote]:border-l-4 [&_blockquote]:border-amber-400 [&_blockquote]:pl-3 [&_a]:underline">
+                <div className="leading-relaxed break-words [&_h1]:font-bold [&_h1]:text-base [&_h2]:font-bold [&_h2]:text-base [&_h2]:mt-3 [&_h3]:font-bold [&_h3]:mt-2 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_code]:font-mono [&_code]:text-xs [&_code]:bg-stone-100 dark:[&_code]:bg-stone-800 [&_code]:px-1 [&_code]:rounded [&_pre]:overflow-x-auto [&_pre]:bg-stone-100 dark:[&_pre]:bg-stone-800 [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:my-2 [&_blockquote]:border-l-4 [&_blockquote]:border-amber-400 [&_blockquote]:pl-3 [&_a]:underline">
                   <Markdown>{msg.text}</Markdown>
                 </div>
               ) : (
@@ -308,12 +308,12 @@ export default function AiAssistantView() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask a question..."
-          className="flex-1 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-700 rounded-2xl px-5 py-3.5 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400 shadow-inner"
+          className="flex-1 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-700 rounded-2xl px-5 py-3.5 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-cobalt-500 shadow-inner"
         />
         <button 
           type="submit"
           disabled={!input.trim() || isGenerating}
-          className={`${activePersona.color} hover:opacity-90 disabled:opacity-50 font-black px-6 py-3.5 rounded-2xl flex items-center gap-2 shadow-lg transition-transform active:scale-95 cursor-pointer`}
+          className={`${activePersona.color} hover:opacity-90 disabled:opacity-50 font-bold px-6 py-3.5 rounded-2xl flex items-center gap-2 shadow-lg transition-transform active:scale-95 cursor-pointer`}
         >
           <span>Send</span>
           <Send className="w-4 h-4" />

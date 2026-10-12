@@ -107,11 +107,11 @@ export default function ProTipsSidebar({
       {/* Header */}
       <div className="flex items-center justify-between gap-2 pb-3 border-b border-stone-200 dark:border-stone-800">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-amber-400 text-stone-950 flex items-center justify-center font-bold">
+          <div className="w-8 h-8 rounded-lg bg-cobalt-600 text-white flex items-center justify-center font-bold">
             <Lightbulb className="w-4 h-4 fill-current" />
           </div>
           <div>
-            <h3 className="text-sm font-black text-stone-900 dark:text-stone-100 uppercase tracking-tight">
+            <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100 uppercase tracking-tight">
               Bench Pro-Tips
             </h3>
             <p className="text-[10px] text-stone-500 font-medium truncate max-w-[190px]">

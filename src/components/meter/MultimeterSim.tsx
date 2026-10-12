@@ -40,7 +40,7 @@ export default function MultimeterSim() {
       <div className="space-y-4 min-w-0">
         {/* Circuit picker */}
         <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/80 p-4 space-y-3">
-          <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2"><Cable className="w-4 h-4 text-emerald-500" />What are the probes touching?</h3>
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2"><Cable className="w-4 h-4 text-emerald-500" />What are the probes touching?</h3>
           <div className="flex flex-wrap gap-1.5">
             {CIRCUITS.map((c) => (
               <button key={c.id} onClick={() => set({ circuit: c.id, connection: 'across', reversed: false })}
@@ -93,7 +93,7 @@ export default function MultimeterSim() {
 
         {/* Mode explainer */}
         <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/80 p-4 space-y-2">
-          <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2"><Gauge className="w-4 h-4 text-indigo-500" />{mode.label} <span className="font-mono text-xs text-slate-400">{mode.dial}</span></h3>
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2"><Gauge className="w-4 h-4 text-indigo-500" />{mode.label} <span className="font-mono text-xs text-slate-400">{mode.dial}</span></h3>
           <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">{mode.measures}</p>
           <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed"><span className="font-bold text-slate-800 dark:text-slate-200">Inside the meter: </span>{mode.inside}</p>
           {st.mode !== 'off' && (
@@ -107,7 +107,7 @@ export default function MultimeterSim() {
 
         {/* Wrong setup simulator */}
         <section className="rounded-2xl border border-red-200 dark:border-red-900/60 bg-red-50/60 dark:bg-red-950/20 p-4 space-y-2">
-          <h3 className="text-sm font-black text-red-800 dark:text-red-200 flex items-center gap-2"><OctagonAlert className="w-4 h-4" />Wrong-setup simulator</h3>
+          <h3 className="text-sm font-bold text-red-800 dark:text-red-200 flex items-center gap-2"><OctagonAlert className="w-4 h-4" />Wrong-setup simulator</h3>
           <p className="text-xs text-red-900/80 dark:text-red-200/80">Load a classic mistake and see what the meter (and the circuit) would do — safely.</p>
           <div className="flex flex-wrap gap-1.5">
             {MISTAKES.map((m) => (

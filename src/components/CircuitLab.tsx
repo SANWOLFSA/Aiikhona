@@ -98,14 +98,14 @@ export default function CircuitLab() {
   const bands = getResistorBands(resistance);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="ds-page space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-stone-900 p-6 rounded-3xl border border-stone-200 dark:border-stone-800 shadow-sm">
         <div className="space-y-1">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 text-xs font-bold mb-2">
             <Cpu className="w-3.5 h-3.5 text-amber-500" />
             <span>Interactive Electronics Bench</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-stone-900 dark:text-stone-100">Live Interactive Circuit Simulation Lab</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-stone-900 dark:text-stone-100">Live Interactive Circuit Simulation Lab</h1>
           <p className="text-xs sm:text-sm text-stone-500 dark:text-stone-400 mt-1">
             Build, probe, and test circuit behaviors in real-time. Practice Ohm's Law, diagnose shorts, and prevent fried components.
           </p>
@@ -115,7 +115,7 @@ export default function CircuitLab() {
             <button 
               key={c.id} 
               onClick={() => loadPreset(c)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${activePreset === c.id ? "bg-amber-400 text-stone-950 shadow-sm scale-102" : "bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-200"}`}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${activePreset === c.id ? "bg-cobalt-600 text-white shadow-sm scale-102" : "bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-200"}`}
             >
               {c.name.split(".")[0]}. Preset
             </button>
@@ -131,7 +131,7 @@ export default function CircuitLab() {
                 <Battery className="w-4 h-4 text-amber-500" />
                 <span>Bench Power Supply (V_IN)</span>
               </div>
-              <span className="text-sm font-mono font-black text-amber-600 dark:text-amber-400">{voltage.toFixed(1)} V</span>
+              <span className="text-sm font-mono font-bold text-amber-600 dark:text-amber-400">{voltage.toFixed(1)} V</span>
             </div>
             <input 
               type="range" 
@@ -157,7 +157,7 @@ export default function CircuitLab() {
                 <SlidersVertical className="w-4 h-4 text-amber-500" />
                 <span>Current Limiting Resistor (R1)</span>
               </div>
-              <span className="text-sm font-mono font-black text-amber-600 dark:text-amber-400">{resistance >= 1000 ? `${(resistance / 1000).toFixed(1)} kΩ` : `${resistance} Ω`}</span>
+              <span className="text-sm font-mono font-bold text-amber-600 dark:text-amber-400">{resistance >= 1000 ? `${(resistance / 1000).toFixed(1)} kΩ` : `${resistance} Ω`}</span>
             </div>
             <input 
               type="range" 
@@ -189,7 +189,7 @@ export default function CircuitLab() {
               <span className="text-xs font-bold text-stone-800 dark:text-stone-200">Circuit Knife Switch (SW1)</span>
               <button 
                 onClick={() => setSwitchOn(!switchOn)}
-                className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all ${switchOn ? "bg-emerald-500 text-white shadow-xs" : "bg-stone-200 dark:bg-stone-700 text-stone-600 dark:text-stone-300"}`}
+                className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${switchOn ? "bg-emerald-500 text-white shadow-xs" : "bg-stone-200 dark:bg-stone-700 text-stone-600 dark:text-stone-300"}`}
               >
                 {switchOn ? "CLOSED (ON)" : "OPEN (OFF)"}
               </button>
@@ -199,7 +199,7 @@ export default function CircuitLab() {
               <span className="text-xs font-bold text-stone-800 dark:text-stone-200">Add Electrolytic Capacitor (C1)</span>
               <button 
                 onClick={() => setHasCapacitor(!hasCapacitor)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${hasCapacitor ? "bg-amber-400 text-stone-950 font-black" : "bg-stone-200 dark:bg-stone-700 text-stone-600 dark:text-stone-300"}`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${hasCapacitor ? "bg-cobalt-600 text-white font-bold" : "bg-stone-200 dark:bg-stone-700 text-stone-600 dark:text-stone-300"}`}
               >
                 {hasCapacitor ? `${capMicrofarads} µF Added` : "None"}
               </button>
@@ -217,7 +217,7 @@ export default function CircuitLab() {
                 <span className="text-xs font-mono text-stone-300 font-bold">{switchOn ? "CIRCUIT ENERGIZED" : "CIRCUIT DISCONNECTED"}</span>
               </div>
               {isBlown && (
-                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-950 border border-red-700 text-red-300 text-xs font-black animate-bounce">
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-950 border border-red-700 text-red-300 text-xs font-bold animate-bounce">
                   <Flame className="w-3.5 h-3.5 text-red-500" />
                   <span>OVERCURRENT! LED BLOWN ({currentMilliamps.toFixed(1)} mA)</span>
                 </div>
@@ -227,7 +227,7 @@ export default function CircuitLab() {
             <div className="relative z-10 py-8 flex flex-col sm:flex-row items-center justify-around gap-6">
               <div className="flex flex-col items-center space-y-2">
                 <div className="w-16 h-20 rounded-xl bg-stone-800 border-2 border-amber-400 flex flex-col items-center justify-center p-2 shadow-lg">
-                  <span className="text-[10px] font-black text-amber-400 uppercase">DC V_IN</span>
+                  <span className="text-[10px] font-bold text-amber-400 uppercase">DC V_IN</span>
                   <span className="text-xs font-mono font-bold text-white">{voltage.toFixed(1)}V</span>
                   <div className="flex gap-2 mt-1">
                     <span className="text-xs font-bold text-red-400">+</span>
@@ -242,7 +242,7 @@ export default function CircuitLab() {
               </div>
 
               <div className="flex flex-col items-center space-y-2">
-                <div onClick={() => setSwitchOn(!switchOn)} className="w-14 h-14 rounded-xl bg-stone-800 border border-stone-700 flex items-center justify-center cursor-pointer hover:border-amber-400 transition-colors">
+                <div onClick={() => setSwitchOn(!switchOn)} className="w-14 h-14 rounded-xl bg-stone-800 border border-stone-700 flex items-center justify-center cursor-pointer hover:border-cobalt-400 transition-colors">
                   <div className={`w-8 h-2 rounded transition-transform ${switchOn ? "bg-emerald-400 rotate-0" : "bg-red-400 -rotate-30 origin-left"}`} />
                 </div>
                 <span className="text-[11px] font-mono text-stone-400">Switch ({switchOn ? "Closed" : "Open"})</span>
@@ -289,25 +289,25 @@ export default function CircuitLab() {
             <div className="relative z-10 bg-stone-950/80 rounded-2xl p-4 border border-stone-800 grid grid-cols-2 sm:grid-cols-4 gap-4 font-mono text-xs">
               <div className="space-y-0.5">
                 <span className="text-[10px] text-stone-500 uppercase tracking-wider">Loop Current</span>
-                <p className={`text-base font-black ${isBlown ? "text-red-400" : "text-amber-400"}`}>{currentMilliamps.toFixed(2)} mA</p>
+                <p className={`text-base font-bold ${isBlown ? "text-red-400" : "text-amber-400"}`}>{currentMilliamps.toFixed(2)} mA</p>
                 <span className="text-[10px] text-stone-400">Ideal: 15-20 mA</span>
               </div>
               
               <div className="space-y-0.5">
                 <span className="text-[10px] text-stone-500 uppercase tracking-wider">Resistor Drop</span>
-                <p className="text-base font-black text-stone-200">{switchOn ? Math.max(0, voltage - forwardVoltage).toFixed(2) : "0.00"} V</p>
+                <p className="text-base font-bold text-stone-200">{switchOn ? Math.max(0, voltage - forwardVoltage).toFixed(2) : "0.00"} V</p>
                 <span className="text-[10px] text-stone-400">V_R = V_IN - V_LED</span>
               </div>
 
               <div className="space-y-0.5">
                 <span className="text-[10px] text-stone-500 uppercase tracking-wider">Power Dissipation</span>
-                <p className="text-base font-black text-stone-200">{powerMilliwatts.toFixed(1)} mW</p>
+                <p className="text-base font-bold text-stone-200">{powerMilliwatts.toFixed(1)} mW</p>
                 <span className="text-[10px] text-stone-400">P = V × I</span>
               </div>
 
               <div className="space-y-0.5">
                 <span className="text-[10px] text-stone-500 uppercase tracking-wider">Circuit Health</span>
-                <p className={`text-base font-black ${isBlown ? "text-red-400" : isGlowing ? "text-emerald-400" : "text-amber-400"}`}>{isBlown ? "CRITICAL" : isGlowing ? "OPTIMAL" : "STANDBY"}</p>
+                <p className={`text-base font-bold ${isBlown ? "text-red-400" : isGlowing ? "text-emerald-400" : "text-amber-400"}`}>{isBlown ? "CRITICAL" : isGlowing ? "OPTIMAL" : "STANDBY"}</p>
                 <span className="text-[10px] text-stone-400">{switchOn ? "Ohm’s Law Verified" : "Open Loop"}</span>
               </div>
             </div>

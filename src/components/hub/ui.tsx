@@ -26,15 +26,15 @@ export function useHubUser(): { uid: string | null; owner: Owner | null } {
 }
 
 export function PageShell({ children }: { children: React.ReactNode }) {
-  return <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">{children}</div>;
+  return <div className="ds-page space-y-6">{children}</div>;
 }
 
 export function Hero({ eyebrow, title, subtitle, children }: { eyebrow: string; title: string; subtitle?: string; children?: React.ReactNode }) {
   return (
-    <div className="rounded-3xl p-6 sm:p-8 bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 text-white shadow-xl space-y-4">
+    <div className="rounded-3xl p-6 sm:p-8 ds-hero text-white shadow-xl space-y-4">
       <div className="space-y-2 max-w-3xl">
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-400/15 border border-emerald-300/30 text-emerald-200 text-[11px] font-black uppercase tracking-wider">{eyebrow}</span>
-        <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{title}</h1>
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-400/15 border border-emerald-300/30 text-emerald-200 text-[11px] font-bold uppercase tracking-wider">{eyebrow}</span>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{title}</h1>
         {subtitle && <p className="text-sm text-indigo-100/80">{subtitle}</p>}
       </div>
       {children}
@@ -45,7 +45,7 @@ export function Hero({ eyebrow, title, subtitle, children }: { eyebrow: string; 
 export function SectionTitle({ icon, title, right }: { icon?: React.ReactNode; title: string; right?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <h2 className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">{icon}{title}</h2>
+      <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">{icon}{title}</h2>
       {right}
     </div>
   );
@@ -84,7 +84,7 @@ export function Sources({ sources, disclaimer }: { sources: Source[]; disclaimer
   if (!sources.length) return disclaimer ? <p className="text-[11px] text-slate-500">{disclaimer}</p> : null;
   return (
     <div className="space-y-2">
-      <div className="text-[11px] font-black uppercase tracking-wider text-slate-500">Sources</div>
+      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Sources</div>
       <ol className="space-y-1 list-decimal list-inside text-xs">
         {sources.map((s) => (
           <li key={s.url} className="truncate">

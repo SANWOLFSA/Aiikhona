@@ -31,7 +31,7 @@ export default function UserManagement() {
   return (
     <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 shadow-sm space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-black text-stone-900 dark:text-stone-100 flex items-center gap-2">
+        <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
           <User className="w-4 h-4 text-amber-500" />
           <span>Registered Users ({users.length})</span>
         </h3>

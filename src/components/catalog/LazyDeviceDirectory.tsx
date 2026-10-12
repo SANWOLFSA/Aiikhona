@@ -7,7 +7,7 @@ type Props = React.ComponentProps<typeof DeviceDirectoryView>;
 
 export default function LazyDeviceDirectory(props: Props) {
   return (
-    <Suspense fallback={<div className="max-w-7xl mx-auto px-4 py-8"><div className="rounded-2xl p-8 text-center text-sm text-stone-500 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 animate-pulse">Loading device directory…</div></div>}>
+    <Suspense fallback={<div className="ds-page"><div className="rounded-2xl p-8 text-center text-sm text-stone-500 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 animate-pulse">Loading device directory…</div></div>}>
       <DeviceDirectoryView {...props} />
     </Suspense>
   );

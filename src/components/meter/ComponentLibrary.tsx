@@ -30,7 +30,7 @@ export default function ComponentLibrary() {
             <div className="shrink-0 w-24 h-16 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 flex items-center justify-center"><ComponentSymbol symbol={c.symbol} className="w-20 h-10" /></div>
             <div className="min-w-0 flex-1">
               <div className="flex items-start gap-1.5">
-                <h3 className="text-sm font-black text-slate-900 dark:text-white leading-tight flex-1">{c.name}</h3>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight flex-1">{c.name}</h3>
                 {c.danger && <ShieldAlert className="w-4 h-4 text-red-500 shrink-0" aria-label="High-voltage safety notes" />}
               </div>
               <p className="text-[11px] text-slate-500 mt-0.5">{c.category}</p>

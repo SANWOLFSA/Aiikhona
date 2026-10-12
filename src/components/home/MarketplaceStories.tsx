@@ -107,7 +107,7 @@ export default function MarketplaceStories({
   return (
     <section aria-label="Marketplace stories" className="relative">
       <div className="flex items-center justify-between mb-2 px-0.5">
-        <h2 className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
           <ShoppingBag className="w-3.5 h-3.5 text-emerald-500" />
           Fresh in the Marketplace
         </h2>
@@ -165,11 +165,11 @@ export default function MarketplaceStories({
                   className={`w-full h-full object-cover transition-all duration-300 ${isSeen ? 'opacity-80 saturate-50' : ''}`}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-black/25" />
-                <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-emerald-400 text-slate-950 text-[10px] font-black shadow-sm">
+                <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-emerald-400 text-slate-950 text-[10px] font-bold shadow-sm">
                   {formatPrice(item.price)}
                 </span>
                 <span
-                  className={`absolute top-2 left-2 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black text-white ring-2 ${
+                  className={`absolute top-2 left-2 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white ring-2 ${
                     isSeen ? 'bg-slate-600 ring-slate-400' : 'bg-gradient-to-br from-indigo-600 to-violet-500 ring-white'
                   }`}
                 >
@@ -419,7 +419,7 @@ function StoryViewer({
         {/* Header */}
         <div className="absolute top-6 inset-x-0 z-20 px-3 flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0 pointer-events-none">
-            <span className="w-9 h-9 shrink-0 rounded-full bg-gradient-to-br from-indigo-600 to-violet-500 ring-2 ring-emerald-300 text-white text-xs font-black flex items-center justify-center">
+            <span className="w-9 h-9 shrink-0 rounded-full bg-gradient-to-br from-indigo-600 to-violet-500 ring-2 ring-emerald-300 text-white text-xs font-bold flex items-center justify-center">
               {initials(item.seller.name)}
             </span>
             <div className="min-w-0">
@@ -456,16 +456,16 @@ function StoryViewer({
         <div className="absolute bottom-0 inset-x-0 z-20 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-3">
           <div className="pointer-events-none space-y-1.5">
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded-md bg-emerald-400 text-slate-950 text-sm font-black">{formatPrice(item.price)}</span>
+              <span className="px-2 py-0.5 rounded-md bg-emerald-400 text-slate-950 text-sm font-bold">{formatPrice(item.price)}</span>
               <span className="px-2 py-0.5 rounded-md bg-white/15 text-white text-[11px] font-bold uppercase tracking-wide">{item.condition}</span>
             </div>
-            <h3 className="text-white text-lg font-black leading-snug line-clamp-2">{item.title}</h3>
+            <h3 className="text-white text-lg font-bold leading-snug line-clamp-2">{item.title}</h3>
             <p className="text-white/75 text-xs leading-relaxed line-clamp-2">{item.description}</p>
           </div>
           <div className="flex gap-2">
             <button
               onClick={() => onViewItem(item)}
-              className="flex-1 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 hover:from-indigo-500 hover:to-violet-400 text-white text-sm font-black shadow-lg shadow-indigo-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+              className="flex-1 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 hover:from-indigo-500 hover:to-violet-400 text-white text-sm font-bold shadow-lg shadow-indigo-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
             >
               <ShoppingBag className="w-4 h-4" />
               View item &amp; buy

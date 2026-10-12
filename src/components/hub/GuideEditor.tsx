@@ -19,7 +19,7 @@ function ListEditor({ label, items, onChange, placeholder }: { label: string; it
   const add = () => { const v = draft.trim(); if (v && items.length < LIMITS.listItems) { onChange([...items, v.slice(0, LIMITS.itemLen)]); setDraft(''); } };
   return (
     <div className="space-y-2">
-      <div className="text-[11px] font-black uppercase tracking-wider text-slate-500">{label}</div>
+      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</div>
       <div className="flex flex-wrap gap-1.5">
         {items.map((t, i) => (
           <span key={i} className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200">
@@ -108,7 +108,7 @@ export default function GuideEditor({ onOpenAuth }: { onOpenAuth?: () => void })
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <RouteLink to="/guides" className="text-xs font-bold text-slate-500 hover:text-indigo-600 inline-flex items-center gap-1"><ArrowLeft className="w-3.5 h-3.5" /> Guides</RouteLink>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-50">{editId ? 'Edit guide' : kind === 'teardown' ? 'Create a teardown' : 'Create a repair guide'}</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">{editId ? 'Edit guide' : kind === 'teardown' ? 'Create a teardown' : 'Create a repair guide'}</h1>
           <p className="text-xs text-slate-500">{status === 'published' ? 'Published guide: changes go live when you publish again.' : 'Drafts are only visible to you until you publish.'}</p>
         </div>
         <div className="flex gap-2">
@@ -123,33 +123,33 @@ export default function GuideEditor({ onOpenAuth }: { onOpenAuth?: () => void })
         <DevicePicker value={device} onChange={setDevice} />
         <div className="grid md:grid-cols-2 gap-3">
           <label className="space-y-1 md:col-span-2">
-            <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">Title</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Title</span>
             <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={LIMITS.title} placeholder={kind === 'teardown' ? 'e.g. Hisense 55A6 teardown' : 'e.g. Samsung UA55 backlight LED strip replacement'} className={input} />
           </label>
           <label className="space-y-1">
-            <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">Guide type</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Guide type</span>
             <select value={kind} onChange={(e) => setKind(e.target.value as GuideKind)} className={input}>
               {GUIDE_KINDS.map((k) => <option key={k} value={k}>{KIND_LABELS[k]}</option>)}
             </select>
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="space-y-1">
-              <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">Difficulty</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Difficulty</span>
               <select value={difficulty} onChange={(e) => setDifficulty(e.target.value as GuideDifficulty)} className={input}>
                 {DIFFICULTIES.map((d) => <option key={d}>{d}</option>)}
               </select>
             </label>
             <label className="space-y-1">
-              <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">Time (minutes)</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Time (minutes)</span>
               <input type="number" min={1} max={10000} value={minutes} onChange={(e) => setMinutes(Math.max(1, Math.min(10000, Number(e.target.value) || 1)))} className={input} />
             </label>
           </div>
           <label className="space-y-1 md:col-span-2">
-            <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">Introduction</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Introduction</span>
             <textarea value={summary} onChange={(e) => setSummary(e.target.value)} maxLength={LIMITS.summary} placeholder="What this guide fixes, symptoms, and anything to know before starting (safety, discharging capacitors, battery level…)" className={`${input} min-h-[90px]`} />
           </label>
           <label className="space-y-1 md:col-span-2">
-            <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">Cover image link (optional)</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Cover image link (optional)</span>
             <div className="flex gap-2">
               <input value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} placeholder="https://…" className={input} maxLength={1000} />
               <label className={`${btnGhost} cursor-pointer shrink-0`}><ImageIcon className="w-3.5 h-3.5" /> Upload
@@ -169,7 +169,7 @@ export default function GuideEditor({ onOpenAuth }: { onOpenAuth?: () => void })
         {steps.map((s, i) => (
           <div key={i} className={`${card} p-5 space-y-3`}>
             <div className="flex items-center justify-between gap-2">
-              <div className="text-sm font-black text-indigo-600 dark:text-indigo-400">Step {i + 1}</div>
+              <div className="text-sm font-bold text-indigo-600 dark:text-indigo-400">Step {i + 1}</div>
               <div className="flex gap-1">
                 <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className={btnGhost} aria-label="Move up"><ArrowUp className="w-3.5 h-3.5" /></button>
                 <button type="button" onClick={() => move(i, 1)} disabled={i === steps.length - 1} className={btnGhost} aria-label="Move down"><ArrowDown className="w-3.5 h-3.5" /></button>
@@ -183,7 +183,7 @@ export default function GuideEditor({ onOpenAuth }: { onOpenAuth?: () => void })
               <input value={s.caution} onChange={(e) => setStep(i, { caution: e.target.value })} maxLength={500} placeholder="Caution / warning for this step (optional)" className={input} />
             </div>
             <div className="space-y-2">
-              <div className="text-[11px] font-black uppercase tracking-wider text-slate-500">Step images (https links, up to {LIMITS.stepImages})</div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Step images (https links, up to {LIMITS.stepImages})</div>
               {s.imageUrls.map((u, k) => (
                 <div key={k} className="flex gap-2 items-center">
                   <input value={u} onChange={(e) => setStep(i, { imageUrls: s.imageUrls.map((x, j) => (j === k ? e.target.value : x)) })} placeholder="https://…" className={input} maxLength={1000} />

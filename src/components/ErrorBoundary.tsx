@@ -24,7 +24,7 @@ export default class ErrorBoundary extends Component<Props, State> {
     return (
       <div role="alert" className="min-h-screen flex items-center justify-center bg-stone-50 dark:bg-stone-950 px-4">
         <div className="max-w-md w-full text-center space-y-4 p-8 rounded-3xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 shadow-sm">
-          <h1 className="text-xl font-black text-stone-900 dark:text-stone-100">Something went wrong</h1>
+          <h1 className="text-xl font-bold text-stone-900 dark:text-stone-100">Something went wrong</h1>
           <p className="text-sm text-stone-600 dark:text-stone-400">
             This page hit an unexpected error. Reloading usually fixes it. Your saved guides and settings are kept.
           </p>
@@ -32,7 +32,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-stone-950 text-sm font-bold"
+              className="px-5 py-2.5 rounded-xl bg-cobalt-600 hover:bg-cobalt-500 text-white text-sm font-bold"
             >
               Reload
             </button>

@@ -72,7 +72,7 @@ function QuestionList() {
 export function QuestionRow({ q }: { q: HubQuestion }) {
   return (
     <RouteLink to={`/answers/q/${q.id}`} className="flex items-center gap-3 px-4 py-3 group hover:bg-slate-50 dark:hover:bg-slate-800/50">
-      <div className={`w-14 text-center rounded-lg py-1.5 text-sm font-black shrink-0 ${q.acceptedAnswerId ? 'bg-emerald-500 text-white' : q.answerCount ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+      <div className={`w-14 text-center rounded-lg py-1.5 text-sm font-bold shrink-0 ${q.acceptedAnswerId ? 'bg-emerald-500 text-white' : q.answerCount ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
         {q.answerCount}<div className="text-[9px] font-bold uppercase">{q.acceptedAnswerId ? 'accepted' : q.answerCount === 1 ? 'answer' : 'answers'}</div>
       </div>
       <div className="min-w-0 flex-1">
@@ -101,7 +101,7 @@ function AskQuestion({ onOpenAuth }: { onOpenAuth?: () => void }) {
   return (
     <PageShell>
       <RouteLink to="/answers" className="text-xs font-bold text-slate-500 hover:text-indigo-600 inline-flex items-center gap-1"><ArrowLeft className="w-3.5 h-3.5" /> Answers</RouteLink>
-      <h1 className="text-2xl font-black text-slate-900 dark:text-slate-50">Ask a question</h1>
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">Ask a question</h1>
       <div className={`${card} p-5 space-y-3`}>
         <DevicePicker value={device} onChange={setDevice} />
         <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={LIMITS.questionTitle} placeholder="Your question in one line (e.g. TV has sound but no picture after a storm)" className={input} />
@@ -124,7 +124,7 @@ function VoteButton({ kind, id, count, ownerUid, onOpenAuth }: { kind: 'question
       onClick={async () => { if (!uid) { onOpenAuth?.(); return; } if (own) return; setBusy(true); try { await setVote(kind, id, uid, !voted); } catch { /* shown by counter not changing */ } finally { setBusy(false); } }}
       disabled={busy || own}
       title={own ? 'You cannot vote on your own post' : voted ? 'Remove your upvote' : 'This is helpful'}
-      className={`flex flex-col items-center px-2 py-1.5 rounded-lg text-xs font-black ${voted ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'} disabled:opacity-60`}>
+      className={`flex flex-col items-center px-2 py-1.5 rounded-lg text-xs font-bold ${voted ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'} disabled:opacity-60`}>
       <ThumbsUp className="w-4 h-4" />{count}
     </button>
   );
@@ -173,7 +173,7 @@ function QuestionPage({ id, onOpenAuth }: { id: string; onOpenAuth?: () => void 
             </div>
           ) : (
             <>
-              <h1 className="text-xl font-black text-slate-900 dark:text-slate-50">{q.title}</h1>
+              <h1 className="text-xl font-bold text-slate-900 dark:text-slate-50">{q.title}</h1>
               <div className="text-xs text-slate-500">For <RouteLink to={q.devicePath} className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline">{q.deviceLabel}</RouteLink> · asked {timeAgo(millis(q.createdAt))} by {q.ownerName}</div>
               {q.body && <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{q.body}</p>}
             </>
@@ -186,7 +186,7 @@ function QuestionPage({ id, onOpenAuth }: { id: string; onOpenAuth?: () => void 
         </div>
       </div>
 
-      <h2 className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-2"><MessageSquare className="w-4 h-4" /> {answers.length} answer{answers.length === 1 ? '' : 's'}</h2>
+      <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><MessageSquare className="w-4 h-4" /> {answers.length} answer{answers.length === 1 ? '' : 's'}</h2>
       <div className="space-y-3">
         {sorted.map((a) => {
           const accepted = a.id === q.acceptedAnswerId;
@@ -195,7 +195,7 @@ function QuestionPage({ id, onOpenAuth }: { id: string; onOpenAuth?: () => void 
             <div key={a.id} className={`${card} p-5 flex gap-4 ${accepted ? 'border-emerald-400 dark:border-emerald-600' : ''}`}>
               <VoteButton kind="answer" id={a.id} count={a.voteCount} ownerUid={a.ownerUid} onOpenAuth={onOpenAuth} />
               <div className="space-y-2 min-w-0 flex-1">
-                {accepted && <div className="text-[11px] font-black uppercase tracking-wider text-emerald-600 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> Accepted answer</div>}
+                {accepted && <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> Accepted answer</div>}
                 {editing === a.id ? (
                   <div className="space-y-2">
                     <textarea value={editText} onChange={(e) => setEditText(e.target.value)} maxLength={LIMITS.answer} className={`${input} min-h-[120px]`} />
@@ -216,7 +216,7 @@ function QuestionPage({ id, onOpenAuth }: { id: string; onOpenAuth?: () => void 
       </div>
 
       <div className={`${card} p-5 space-y-3`}>
-        <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">Your answer</h3>
+        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Your answer</h3>
         {owner ? (
           <>
             <textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={LIMITS.answer} placeholder="Explain what to check and how (expected voltages, test points, parts). Be specific and safe." className={`${input} min-h-[120px]`} />

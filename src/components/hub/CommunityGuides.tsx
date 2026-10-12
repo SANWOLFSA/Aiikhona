@@ -16,7 +16,7 @@ export function GuideCard({ g }: { g: HubGuide }) {
         : <div className="w-full aspect-[16/9] bg-gradient-to-br from-indigo-100 to-emerald-100 dark:from-indigo-950 dark:to-emerald-950 flex items-center justify-center"><BookOpen className="w-8 h-8 text-indigo-400" /></div>}
       <div className="p-4 space-y-2 flex-1">
         <div className="text-[11px] font-bold text-slate-500 truncate">{g.deviceLabel}</div>
-        <div className="text-sm font-black text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 line-clamp-2">{g.title}</div>
+        <div className="text-sm font-bold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 line-clamp-2">{g.title}</div>
         <div className="flex flex-wrap gap-1">
           <Chip className={DIFF_STYLE[g.difficulty]}>{g.difficulty}</Chip>
           <Chip><Clock className="w-3 h-3" />{g.minutes} min</Chip>
@@ -79,7 +79,7 @@ export default function CommunityGuides({ teardownsOnly = false, embedded = fals
 
       {drafts.length > 0 && (
         <div className={`${card} p-4 space-y-2`}>
-          <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1"><FileEdit className="w-3.5 h-3.5" /> Your drafts</div>
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1"><FileEdit className="w-3.5 h-3.5" /> Your drafts</div>
           <div className="flex flex-wrap gap-2">
             {drafts.map((g) => <RouteLink key={g.id} to={`/guides/edit/${g.id}`} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-indigo-600 hover:text-white">{g.title || 'Untitled'}</RouteLink>)}
           </div>
@@ -99,8 +99,8 @@ export default function CommunityGuides({ teardownsOnly = false, embedded = fals
 
   if (embedded) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-3">
-        <h2 className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2"><BookOpen className="w-4 h-4" /> Community step-by-step guides{guides?.length ? ` · ${guides.length}` : ''}</h2>
+      <div className="w-full px-4 sm:px-6 lg:px-10 pt-8 space-y-3">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2"><BookOpen className="w-4 h-4" /> Community step-by-step guides{guides?.length ? ` · ${guides.length}` : ''}</h2>
         {body}
       </div>
     );

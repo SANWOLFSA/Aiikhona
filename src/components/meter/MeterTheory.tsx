@@ -4,7 +4,7 @@ import { Cpu, ShieldAlert, Ruler, Waves, Gauge, ListChecks } from 'lucide-react'
 function Card({ icon, title, children, id }: { icon: ReactNode; title: string; children: ReactNode; id?: string }) {
   return (
     <section id={id} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/80 p-4 sm:p-5 space-y-3 scroll-mt-40">
-      <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">{icon}{title}</h3>
+      <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">{icon}{title}</h3>
       {children}
     </section>
   );
@@ -67,8 +67,8 @@ function TrueRmsDemo() {
         <text x="6" y="14" fill="#94a3b8" fontSize="9">peak {peak} V</text>
       </svg>
       <div className="grid grid-cols-2 gap-2 max-w-md">
-        <div className="rounded-xl p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900"><div className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">True-RMS meter</div><div className="font-mono text-xl font-black text-slate-900 dark:text-white">{rms.toFixed(1)} V</div></div>
-        <div className="rounded-xl p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900"><div className="text-[11px] font-bold text-amber-700 dark:text-amber-300">Average-responding meter</div><div className="font-mono text-xl font-black text-slate-900 dark:text-white">{avgResp.toFixed(1)} V</div><div className="text-[11px] text-slate-500">{Math.abs(err) < 0.5 ? 'correct for a sine' : `${err > 0 ? '+' : ''}${err.toFixed(1)} % error`}</div></div>
+        <div className="rounded-xl p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900"><div className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">True-RMS meter</div><div className="font-mono text-xl font-bold text-slate-900 dark:text-white">{rms.toFixed(1)} V</div></div>
+        <div className="rounded-xl p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900"><div className="text-[11px] font-bold text-amber-700 dark:text-amber-300">Average-responding meter</div><div className="font-mono text-xl font-bold text-slate-900 dark:text-white">{avgResp.toFixed(1)} V</div><div className="text-[11px] text-slate-500">{Math.abs(err) < 0.5 ? 'correct for a sine' : `${err > 0 ? '+' : ''}${err.toFixed(1)} % error`}</div></div>
       </div>
       <P>An average-responding meter rectifies the signal, takes the average and multiplies by 1.111 — the ratio that is only true for a perfect sine wave. On square waves, triangle waves, dimmers, VSD/inverter outputs and switch-mode loads it reads wrong. A true-RMS meter calculates the real heating value (√ of the mean of v²), so it stays correct. Check the meter's crest-factor and bandwidth specs for very spiky or high-frequency signals.</P>
     </div>
@@ -107,7 +107,7 @@ export default function MeterTheory() {
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead><tr className="text-slate-400 uppercase"><th className="py-1.5 pr-2">Category</th><th className="py-1.5 pr-2">Where</th><th className="py-1.5">Note</th></tr></thead>
-            <tbody>{CAT_ROWS.map((r) => <tr key={r[0]} className="border-t border-slate-200 dark:border-slate-800 align-top"><td className="py-2 pr-2 font-black text-slate-900 dark:text-white whitespace-nowrap">{r[0]}</td><td className="py-2 pr-2 text-slate-700 dark:text-slate-300">{r[1]}</td><td className="py-2 text-slate-500">{r[2]}</td></tr>)}</tbody>
+            <tbody>{CAT_ROWS.map((r) => <tr key={r[0]} className="border-t border-slate-200 dark:border-slate-800 align-top"><td className="py-2 pr-2 font-bold text-slate-900 dark:text-white whitespace-nowrap">{r[0]}</td><td className="py-2 pr-2 text-slate-700 dark:text-slate-300">{r[1]}</td><td className="py-2 text-slate-500">{r[2]}</td></tr>)}</tbody>
           </table>
         </div>
         <ul className="list-disc pl-5 space-y-1.5 text-sm text-slate-700 dark:text-slate-300">

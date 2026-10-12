@@ -57,7 +57,7 @@ export default function VideoModeration({ actor }: { actor: Actor | null }) {
       {visible.length === 0 ? (
         <div className={`${cardCls} py-12 px-6 text-center space-y-2`}>
           <Film className="w-9 h-9 mx-auto text-emerald-500" />
-          <p className="text-sm font-black text-slate-900 dark:text-slate-100">{filter === 'reported' ? 'No reported videos' : 'Nothing here'}</p>
+          <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{filter === 'reported' ? 'No reported videos' : 'Nothing here'}</p>
           <p className="text-xs text-slate-500">Community repair videos shared on solutions pages show up here.</p>
         </div>
       ) : (
@@ -83,13 +83,13 @@ function Row({ video: v, reports, reportCount, actor }: { video: CommunityVideo;
 
   return (
     <div className={`${cardCls} p-3 flex gap-3`}>
-      <div className="w-28 shrink-0 aspect-video rounded-lg overflow-hidden bg-gradient-to-br from-indigo-950 to-emerald-950 flex items-center justify-center">
+      <div className="w-28 shrink-0 aspect-video rounded-lg overflow-hidden ds-hero flex items-center justify-center">
         {v.thumbnailUrl ? <img src={v.thumbnailUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <Film className="w-6 h-6 text-white/70" />}
       </div>
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-black text-slate-900 dark:text-slate-100 break-words">{v.title}</p>
-          <span className={`shrink-0 px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${v.status === 'published' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300'}`}>{v.status}</span>
+          <p className="text-sm font-bold text-slate-900 dark:text-slate-100 break-words">{v.title}</p>
+          <span className={`shrink-0 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${v.status === 'published' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300'}`}>{v.status}</span>
         </div>
         <p className="text-[11px] text-slate-500">
           <RouteLink to={v.pagePath} className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline">{v.deviceLabel}</RouteLink>
@@ -98,7 +98,7 @@ function Row({ video: v, reports, reportCount, actor }: { video: CommunityVideo;
         <a href={v.url} target="_blank" rel="noopener noreferrer" className="text-[11px] font-bold text-slate-500 hover:underline inline-flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Open video</a>
         {reportCount > 0 && (
           <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 text-[11px] text-amber-900 dark:text-amber-200 space-y-0.5">
-            <p className="font-black flex items-center gap-1"><Flag className="w-3 h-3" /> {reportCount} report{reportCount === 1 ? '' : 's'}</p>
+            <p className="font-bold flex items-center gap-1"><Flag className="w-3 h-3" /> {reportCount} report{reportCount === 1 ? '' : 's'}</p>
             {reports.slice(0, 4).map(r => <p key={r.id} className="break-words">• {r.reason}</p>)}
           </div>
         )}

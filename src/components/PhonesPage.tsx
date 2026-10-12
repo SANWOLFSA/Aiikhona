@@ -105,7 +105,7 @@ Issue: ${issueToSearch}`;
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
+    <div className="ds-page">
       {/* Header Section - Themed Telemetry Banner */}
       <div className={`${themeConfig?.cardBannerBg || 'bg-slate-900 border-slate-800'} rounded-2xl p-7 md:p-8 mb-6 text-white shadow-xs border relative overflow-hidden`}>
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">

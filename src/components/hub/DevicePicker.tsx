@@ -20,7 +20,7 @@ export default function DevicePicker({ value, onChange }: { value: DeviceRef | n
     return (
       <div className={`${card} px-4 py-3 flex items-center justify-between gap-3`}>
         <div className="min-w-0">
-          <div className="text-[11px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Device</div>
+          <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Device</div>
           <div className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{value.label}</div>
         </div>
         <button type="button" onClick={() => onChange(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700" aria-label="Change device"><X className="w-4 h-4" /></button>

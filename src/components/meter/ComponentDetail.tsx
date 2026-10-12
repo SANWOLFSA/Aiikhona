@@ -11,7 +11,7 @@ function Box({ icon, title, children, tone = 'plain' }: { icon: ReactNode; title
     bad: 'border-amber-200 dark:border-amber-900 bg-amber-50/70 dark:bg-amber-950/30',
     danger: 'border-red-300 dark:border-red-900 bg-red-50/80 dark:bg-red-950/30',
   };
-  return <section className={`rounded-2xl border p-4 space-y-2 ${tones[tone]}`}><h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">{icon}{title}</h3>{children}</section>;
+  return <section className={`rounded-2xl border p-4 space-y-2 ${tones[tone]}`}><h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">{icon}{title}</h3>{children}</section>;
 }
 
 export default function ComponentDetail({ id }: { id: string }) {
@@ -39,7 +39,7 @@ export default function ComponentDetail({ id }: { id: string }) {
         <div className="shrink-0 w-full sm:w-44 h-24 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 flex items-center justify-center"><ComponentSymbol symbol={c.symbol} className="w-40 h-20" /></div>
         <div className="space-y-2 min-w-0">
           <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">{c.category}</p>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">How to test: {c.name}</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">How to test: {c.name}</h2>
           <p className="text-sm text-slate-600 dark:text-slate-300">{c.summary}</p>
           <div className="flex flex-wrap gap-1.5">
             {c.modes.map((m) => <span key={m} className="px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold">{MODE_BY_ID[m].dial.trim()} · {MODE_BY_ID[m].label}</span>)}
@@ -60,7 +60,7 @@ export default function ComponentDetail({ id }: { id: string }) {
             <ol className="space-y-2">
               {c.steps.map((s, i) => (
                 <li key={i} className="flex gap-3 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                  <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white text-xs font-black flex items-center justify-center shrink-0">{i + 1}</span><span>{s}</span>
+                  <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white text-xs font-bold flex items-center justify-center shrink-0">{i + 1}</span><span>{s}</span>
                 </li>
               ))}
             </ol>

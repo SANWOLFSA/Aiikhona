@@ -107,7 +107,7 @@ export default function GuideView({ onOpenAuth }: { onOpenAuth?: () => void }) {
             <Chip><Clock className="w-3 h-3" /> {guide.minutes >= 120 ? `${Math.round(guide.minutes / 6) / 10} h` : `${guide.minutes} min`}</Chip>
             <Chip>{guide.steps.length} steps{totalImages ? ` · ${totalImages} images` : ''}</Chip>
           </div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-50 leading-tight">{guide.title}</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50 leading-tight">{guide.title}</h1>
           <div className="text-xs text-slate-500">
             For <RouteLink to={guide.devicePath} className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline">{guide.deviceLabel}</RouteLink>
             {' '}· by <RouteLink to="/contributors" className="font-bold hover:underline">{guide.ownerName}</RouteLink> · updated {timeAgo(millis(guide.updatedAt))}
@@ -133,7 +133,7 @@ export default function GuideView({ onOpenAuth }: { onOpenAuth?: () => void }) {
         <div className="grid md:grid-cols-2 gap-4">
           {guide.parts.length > 0 && (
             <section className={`${card} p-5 space-y-3`}>
-              <h2 className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-2"><Package className="w-4 h-4 text-emerald-500" /> Parts (fix kit)</h2>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Package className="w-4 h-4 text-emerald-500" /> Parts (fix kit)</h2>
               {guide.parts.map((p) => (
                 <div key={p} className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{p}</span>
@@ -147,7 +147,7 @@ export default function GuideView({ onOpenAuth }: { onOpenAuth?: () => void }) {
           )}
           {guide.tools.length > 0 && (
             <section className={`${card} p-5 space-y-3`}>
-              <h2 className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-2"><Wrench className="w-4 h-4 text-indigo-500" /> Tools</h2>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Wrench className="w-4 h-4 text-indigo-500" /> Tools</h2>
               {guide.tools.map((t) => (
                 <div key={t} className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{t}</span>
@@ -165,7 +165,7 @@ export default function GuideView({ onOpenAuth }: { onOpenAuth?: () => void }) {
       <ol className="space-y-4">
         {guide.steps.map((s, i) => (
           <li key={i} id={`step-${i + 1}`} className={`${card} p-5 space-y-3`}>
-            <h3 className="text-base font-black text-slate-900 dark:text-slate-100"><span className="text-indigo-600 dark:text-indigo-400">Step {i + 1}</span>{s.title ? ` · ${s.title}` : ''}</h3>
+            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100"><span className="text-indigo-600 dark:text-indigo-400">Step {i + 1}</span>{s.title ? ` · ${s.title}` : ''}</h3>
             {s.imageUrls?.length > 0 && (
               <div className={`grid gap-2 ${s.imageUrls.length === 1 ? 'grid-cols-1 max-w-xl' : 'grid-cols-2 sm:grid-cols-3'}`}>
                 {s.imageUrls.map((u) => (
@@ -183,7 +183,7 @@ export default function GuideView({ onOpenAuth }: { onOpenAuth?: () => void }) {
       </ol>
 
       <section className={`${card} p-5 space-y-3 text-center`}>
-        <h2 className="text-lg font-black text-slate-900 dark:text-slate-100">Finished?</h2>
+        <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Finished?</h2>
         <p className="text-sm text-slate-500">To reassemble, follow the steps in reverse. Take e-waste and old batteries to a certified recycler.</p>
         <button onClick={toggleDone} disabled={busy || guide.status !== 'published'} className={done ? btnGhost : btnMint}>
           <CheckCircle2 className="w-4 h-4" /> {done ? `You and ${Math.max(0, guide.completedCount - 1)} others fixed it` : `I fixed it! (${guide.completedCount} so far)`}
@@ -192,7 +192,7 @@ export default function GuideView({ onOpenAuth }: { onOpenAuth?: () => void }) {
       </section>
 
       <section className={`${card} p-5 space-y-3`}>
-        <h2 className="text-sm font-black text-slate-900 dark:text-slate-100">Guide comments</h2>
+        <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">Guide comments</h2>
         <CommentThread guide={guide} stepIndex={-1} comments={comments} onOpenAuth={onOpenAuth} />
       </section>
 

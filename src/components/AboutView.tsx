@@ -2,14 +2,14 @@ import { Info, ShieldCheck, Cpu, Leaf } from 'lucide-react';
 
 export default function AboutView() {
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
+    <div className="ds-page space-y-8">
       {/* Header */}
       <div className="flex items-center gap-3 pb-6 border-b border-stone-200 dark:border-stone-800">
-        <div className="w-12 h-12 rounded-2xl bg-amber-400 text-stone-950 flex items-center justify-center font-black shadow-lg">
+        <div className="w-12 h-12 rounded-2xl bg-cobalt-600 text-white flex items-center justify-center font-bold shadow-lg">
           <Info className="w-6 h-6" />
         </div>
         <div>
-          <h1 className="text-xl font-black text-stone-900 dark:text-stone-100">About DIY Electronics</h1>
+          <h1 className="text-xl font-bold text-stone-900 dark:text-stone-100">About DIY Electronics</h1>
           <p className="text-xs text-stone-500 dark:text-stone-400">Repair guides, AI help and a parts marketplace for technicians and makers</p>
         </div>
       </div>
@@ -38,7 +38,7 @@ export default function AboutView() {
 
       <div className="bg-stone-900 text-stone-100 dark:bg-stone-900 dark:border dark:border-stone-800 rounded-3xl p-8 space-y-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-400 text-stone-950 flex items-center justify-center font-bold">
+          <div className="w-10 h-10 rounded-xl bg-cobalt-600 text-white flex items-center justify-center font-bold">
             <Cpu className="w-5 h-5" />
           </div>
           <div>

@@ -45,7 +45,7 @@ export default function RequestDevice({ initialName = '', onOpenAuth, compact = 
   return (
     <div className={`${card} p-5 space-y-3`}>
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">Missing a device?</h3>
+        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Missing a device?</h3>
         <div className="flex gap-1">
           <button onClick={() => { setMode('request'); setDone(null); }} className={mode === 'request' ? btnPrimary : btnGhost}>Request it</button>
           <button onClick={() => { setMode('add'); setDone(null); }} className={mode === 'add' ? btnPrimary : btnGhost}>Add it myself</button>

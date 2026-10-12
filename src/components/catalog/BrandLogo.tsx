@@ -40,7 +40,7 @@ export default function BrandLogo({ name, domain, simpleIconSlug, className = 'w
   }
   const letters = name.replace(/\(.*?\)/g, '').trim().split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || '?';
   return (
-    <div className={`${className} rounded-xl bg-gradient-to-br ${PALETTE[hash(name) % PALETTE.length]} text-white font-black text-xs flex items-center justify-center shrink-0 tracking-wider`} aria-label={`${name} logo`}>
+    <div className={`${className} rounded-xl bg-gradient-to-br ${PALETTE[hash(name) % PALETTE.length]} text-white font-bold text-xs flex items-center justify-center shrink-0 tracking-wider`} aria-label={`${name} logo`}>
       {letters}
     </div>
   );

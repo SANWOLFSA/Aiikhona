@@ -116,7 +116,7 @@ export default function GuideVideoTutorialTab({ guide }: GuideVideoTutorialTabPr
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             AI-written walkthrough
           </span>
-          <h2 className="text-lg sm:text-xl font-black text-white">
+          <h2 className="text-lg sm:text-xl font-bold text-white">
             {tutorial ? tutorial.title : `Walkthrough: ${guide.title}`}
           </h2>
           <p className="text-xs text-stone-300">
@@ -164,7 +164,7 @@ export default function GuideVideoTutorialTab({ guide }: GuideVideoTutorialTabPr
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           <div className="lg:col-span-8 space-y-4">
-            <div className="flex items-center gap-2 font-black text-xs uppercase tracking-wider text-stone-900 dark:text-stone-100">
+            <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-stone-900 dark:text-stone-100">
               <Layers className="w-4 h-4 text-amber-500" />
               <span>Chapters ({tutorial.chapters.length})</span>
             </div>
@@ -241,7 +241,7 @@ export default function GuideVideoTutorialTab({ guide }: GuideVideoTutorialTabPr
 
             {tutorial.keyTakeaways && tutorial.keyTakeaways.length > 0 && (
               <div className="p-4 rounded-2xl bg-stone-50 dark:bg-stone-800/40 border border-stone-200 dark:border-stone-800 space-y-2">
-                <h4 className="text-xs font-black uppercase tracking-wider text-stone-800 dark:text-stone-200 flex items-center gap-1.5">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-stone-800 dark:text-stone-200 flex items-center gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                   <span>Key Takeaways</span>
                 </h4>

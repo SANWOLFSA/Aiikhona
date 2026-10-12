@@ -81,7 +81,7 @@ export function SignInPrompt({ action, onOpenAuth }: { action: string; onOpenAut
 }
 
 export function Sources({ sources, disclaimer }: { sources: Source[]; disclaimer?: string }) {
-  if (!sources.length) return null;
+  if (!sources.length) return disclaimer ? <p className="text-[11px] text-slate-500">{disclaimer}</p> : null;
   return (
     <div className="space-y-2">
       <div className="text-[11px] font-black uppercase tracking-wider text-slate-500">Sources</div>

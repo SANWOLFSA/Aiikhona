@@ -100,6 +100,16 @@ async function requireFirebaseUser(req: express.Request, res: express.Response, 
   next();
 }
 
+// Free-tier keys have no Google Search grounding quota. When it is exhausted we answer from the
+// model's own knowledge instead, and tell the model so (prompts that say "use Google Search" still work).
+let groundingBlockedUntil = 0;
+const UNGROUNDED_NOTE = 'NOTE: Live web search is unavailable right now. Answer from your own training knowledge instead. Wherever the instructions say "supported by the search results" read it as "that you know with high confidence". Set "found": true when you confidently recognise this exact item; still never invent part numbers, ratings or pinouts you are unsure of (use null or [] instead).';
+function withoutSearchNote(contents: any) {
+  if (!Array.isArray(contents)) return contents;
+  return contents.map((c: any, i: number) => i === contents.length - 1 && c?.role === 'user' && Array.isArray(c.parts)
+    ? { ...c, parts: [...c.parts, { text: UNGROUNDED_NOTE }] } : c);
+}
+
 // Resilient multi-model Gemini caller with intelligent cascade
 async function callGeminiWithCascade(
   ai: GoogleGenAI,
@@ -113,6 +123,11 @@ async function callGeminiWithCascade(
   // (gemini-3.1-flash-lite is scheduled for shutdown on 2027-05-07: https://ai.google.dev/gemini-api/docs/deprecations)
   const models = ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
   let lastError: any = null;
+
+  // If grounding quota was recently exhausted, skip the grounded attempt entirely (fast answers on free tier).
+  if (tools && Date.now() < groundingBlockedUntil) {
+    return callGeminiWithCascade(ai, withoutSearchNote(contents), systemInstruction, undefined, extraConfig, onResponse);
+  }
 
   for (const model of models) {
     try {
@@ -146,8 +161,9 @@ async function callGeminiWithCascade(
   // If every grounded attempt was rate-limited, retry once without tools so users still get an answer.
   const lastMsg = String(lastError?.message || lastError || '');
   if (tools && (lastMsg.includes('429') || lastMsg.includes('RESOURCE_EXHAUSTED') || lastMsg.includes('quota'))) {
-    console.warn('Grounded Gemini calls were rate-limited; retrying without tools.');
-    return callGeminiWithCascade(ai, contents, systemInstruction, undefined, extraConfig, onResponse);
+    console.warn('Grounded Gemini calls were rate-limited; retrying without tools for the next 15 minutes.');
+    groundingBlockedUntil = Date.now() + 15 * 60 * 1000;
+    return callGeminiWithCascade(ai, withoutSearchNote(contents), systemInstruction, undefined, extraConfig, onResponse);
   }
 
   throw lastError || new Error("All candidate Gemini models were unavailable.");
@@ -2325,7 +2341,7 @@ Rules: Only include facts supported by the search results. Never guess or invent
     .slice(0, 16)
     .map((x: any) => ({ role: String(x.role || 'IC').slice(0, 60), part: String(x.part).slice(0, 120) }));
   // Without grounding sources nothing can be cited, so report it as unknown rather than trusting the model.
-  const found = parsed.found === true && sources.length > 0;
+  const found = parsed.found === true;
   return {
     found,
     boardNumber: typeof parsed.boardNumber === 'string' ? parsed.boardNumber.slice(0, 80) : display,
@@ -2336,7 +2352,7 @@ Rules: Only include facts supported by the search results. Never guess or invent
     commonFaults: found ? strArr(parsed.commonFaults, 12, 240) : [],
     notes: found ? strArr(parsed.notes, 8, 300) : [],
     sources,
-    disclaimer: 'Summarised by AI from the cited web sources. Verify against the schematic for your exact board revision.',
+    disclaimer: sources.length ? 'Summarised by AI from the cited web sources. Verify against the schematic for your exact board revision.' : 'From AI knowledge (live web search unavailable). Verify against the label, schematic or datasheet before repairing.',
   };
 }
 
@@ -2496,7 +2512,7 @@ Rules: only include facts supported by the search results. Never guess. Use null
     (r) => { grounding = r?.candidates?.[0]?.groundingMetadata || null; });
   const p = parseJsonLoose(text) || {};
   const sources = collectGroundingSources(grounding);
-  const found = p.found === true && sources.length > 0 && typeof p.name === 'string' && p.name.trim().length > 1;
+  const found = p.found === true && typeof p.name === 'string' && p.name.trim().length > 1;
   const rep = p.repairability && typeof p.repairability === 'object' ? p.repairability : {};
   const score = typeof rep.score === 'number' && rep.score >= 0 && rep.score <= 10 && typeof rep.source === 'string' && rep.source.trim() ? Math.round(rep.score * 10) / 10 : null;
   return {
@@ -2516,7 +2532,7 @@ Rules: only include facts supported by the search results. Never guess. Use null
     teardownNotes: found ? strArr(p.teardownNotes, 10, 300) : [],
     keyParts: found ? strArr(p.keyParts, 16, 80) : [],
     sources,
-    disclaimer: 'Summarised by AI from the cited web sources. Check the rating label on your unit and the manufacturer documentation before repairing.',
+    disclaimer: sources.length ? 'Summarised by AI from the cited web sources. Check the rating label on your unit and the manufacturer documentation before repairing.' : 'From AI knowledge (live web search unavailable). Verify against the label, schematic or datasheet before repairing.',
   };
 }
 
@@ -2564,7 +2580,7 @@ Rules: only include facts supported by the search results (prefer the official d
     (r) => { grounding = r?.candidates?.[0]?.groundingMetadata || null; });
   const p = parseJsonLoose(text) || {};
   const sources = collectGroundingSources(grounding);
-  const found = p.found === true && sources.length > 0;
+  const found = p.found === true;
   const pinout = (Array.isArray(p.pinout) ? p.pinout : [])
     .filter((x: any) => x && (typeof x.pin === 'string' || typeof x.pin === 'number') && typeof x.name === 'string')
     .slice(0, 64)
@@ -2588,7 +2604,7 @@ Rules: only include facts supported by the search results (prefer the official d
     testNotes: found ? strArr(p.testNotes, 8, 300) : [],
     sources,
     links: componentReferenceLinks(pn, manufacturer),
-    disclaimer: 'Summarised by AI from the cited sources. Always confirm ratings and pinout in the official datasheet before substituting a part.',
+    disclaimer: sources.length ? 'Summarised by AI from the cited sources. Always confirm ratings and pinout in the official datasheet before substituting a part.' : 'From AI knowledge (live web search unavailable). Verify against the label, schematic or datasheet before repairing.',
   };
 }
 

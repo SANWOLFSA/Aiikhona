@@ -652,7 +652,7 @@ const trimSources = (s: Source[]) => s.slice(0, 10).map((x) => ({ title: String(
 /** Save an AI-researched device (must be found with sources). Returns the slug it was stored under. */
 export async function saveDiscoveredDevice(info: DeviceInfo, owner: Owner): Promise<string> {
   requireDb();
-  if (!info.found || info.sources.length === 0) throw new Error('Only devices identified with cited sources can be saved.');
+  if (!info.found) throw new Error('Only identified devices can be saved.');
   const slug = deviceSlug(info.name);
   const existing = await getDiscoveredDevice(slug);
   if (existing) return slug;
@@ -737,7 +737,7 @@ export async function addUserDevice(input: UserDeviceInput, owner: Owner): Promi
 
 export async function saveDiscoveredComponent(info: ComponentInfo, owner: Owner): Promise<string> {
   requireDb();
-  if (!info.found || info.sources.length === 0) throw new Error('Only parts identified with cited sources can be saved.');
+  if (!info.found) throw new Error('Only identified parts can be saved.');
   const id = normalizePartNumber(info.partNumber || info.query);
   if (!PART_ID_RE.test(id)) throw new Error('That part number cannot be stored.');
   const existing = await getDiscoveredComponent(id);
